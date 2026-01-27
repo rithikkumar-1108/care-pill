@@ -2,95 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* MediTrack - Warm & Friendly Design System */
+/* Soft orange and teal color palette for elderly-friendly UI */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Warm cream background */
+    --background: 40 33% 98%;
+    --foreground: 20 14% 20%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Card with soft warmth */
+    --card: 40 40% 99%;
+    --card-foreground: 20 14% 20%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    /* Popover */
+    --popover: 40 40% 99%;
+    --popover-foreground: 20 14% 20%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Warm Orange */
+    --primary: 24 90% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Soft Teal */
+    --secondary: 174 50% 45%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted - Soft grey with warmth */
+    --muted: 30 15% 92%;
+    --muted-foreground: 20 10% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Light teal */
+    --accent: 174 40% 90%;
+    --accent-foreground: 174 50% 25%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive - Soft red */
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Success - Soft green */
+    --success: 142 60% 45%;
+    --success-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    /* Warning - Amber */
+    --warning: 45 93% 55%;
+    --warning-foreground: 30 30% 20%;
 
-    --sidebar-background: 0 0% 98%;
+    /* Borders and inputs */
+    --border: 30 20% 88%;
+    --input: 30 20% 88%;
+    --ring: 24 90% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --radius: 1rem;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Sidebar */
+    --sidebar-background: 40 30% 96%;
+    --sidebar-foreground: 20 14% 30%;
+    --sidebar-primary: 24 90% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 174 40% 92%;
+    --sidebar-accent-foreground: 174 50% 25%;
+    --sidebar-border: 30 20% 88%;
+    --sidebar-ring: 24 90% 55%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Session colors */
+    --session-morning: 45 100% 55%;
+    --session-morning-foreground: 30 30% 20%;
+    --session-afternoon: 24 90% 55%;
+    --session-afternoon-foreground: 0 0% 100%;
+    --session-night: 220 60% 35%;
+    --session-night-foreground: 0 0% 100%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Status colors */
+    --status-taken: 142 60% 45%;
+    --status-missed: 0 72% 55%;
+    --status-pending: 30 15% 70%;
+    --status-skipped: 45 93% 55%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 20 14% 12%;
+    --foreground: 40 30% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 20 14% 15%;
+    --card-foreground: 40 30% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 20 14% 15%;
+    --popover-foreground: 40 30% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 24 85% 60%;
+    --primary-foreground: 20 14% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 174 45% 50%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 20 10% 25%;
+    --muted-foreground: 40 20% 70%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 174 30% 25%;
+    --accent-foreground: 174 40% 85%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --success: 142 50% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 90% 50%;
+    --warning-foreground: 30 30% 10%;
+
+    --border: 20 10% 25%;
+    --input: 20 10% 25%;
+    --ring: 24 85% 60%;
+
+    --sidebar-background: 20 14% 10%;
+    --sidebar-foreground: 40 30% 90%;
+    --sidebar-primary: 24 85% 60%;
+    --sidebar-primary-foreground: 20 14% 10%;
+    --sidebar-accent: 174 30% 20%;
+    --sidebar-accent-foreground: 174 40% 85%;
+    --sidebar-border: 20 10% 25%;
+    --sidebar-ring: 24 85% 60%;
+
+    --session-morning: 45 95% 50%;
+    --session-morning-foreground: 30 30% 10%;
+    --session-afternoon: 24 85% 60%;
+    --session-afternoon-foreground: 0 0% 100%;
+    --session-night: 220 50% 50%;
+    --session-night-foreground: 0 0% 100%;
+
+    --status-taken: 142 50% 45%;
+    --status-missed: 0 65% 50%;
+    --status-pending: 20 10% 40%;
+    --status-skipped: 45 90% 50%;
   }
 }
 
@@ -101,5 +144,75 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Elderly-friendly base font size */
+  html {
+    font-size: 18px;
+  }
+
+  /* Ensure good tap targets on mobile */
+  button, 
+  a, 
+  input, 
+  select, 
+  textarea {
+    min-height: 48px;
+  }
+}
+
+@layer utilities {
+  /* Session card gradients */
+  .session-morning {
+    @apply bg-gradient-to-br from-amber-100 to-yellow-200 dark:from-amber-900/50 dark:to-yellow-800/50;
+  }
+  
+  .session-afternoon {
+    @apply bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/50 dark:to-orange-800/50;
+  }
+  
+  .session-night {
+    @apply bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900/50 dark:to-indigo-800/50;
+  }
+
+  /* Status badges */
+  .status-taken {
+    @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300;
+  }
+  
+  .status-missed {
+    @apply bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300;
+  }
+  
+  .status-pending {
+    @apply bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400;
+  }
+  
+  .status-skipped {
+    @apply bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300;
+  }
+
+  /* Stock status */
+  .stock-good {
+    @apply text-emerald-600 dark:text-emerald-400;
+  }
+  
+  .stock-low {
+    @apply text-amber-600 dark:text-amber-400;
+  }
+  
+  .stock-critical {
+    @apply text-red-600 dark:text-red-400;
+  }
+
+  /* Large touch-friendly button */
+  .btn-elderly {
+    @apply min-h-[56px] text-lg px-6 rounded-2xl font-semibold shadow-md hover:shadow-lg transition-all;
+  }
+
+  /* Card with warm shadow */
+  .card-warm {
+    @apply rounded-2xl shadow-lg shadow-orange-200/30 dark:shadow-orange-900/20 border-0;
   }
 }
