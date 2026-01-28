@@ -178,7 +178,7 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
                 </div>
 
                 {status === 'pending' && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       className="flex-1 btn-elderly bg-success hover:bg-success/90"
                       onClick={() => handleMarkDose(medicine, 'taken')}
@@ -188,7 +188,7 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
                     </Button>
                     <Button
                       variant="outline"
-                      className="btn-elderly"
+                      className="btn-elderly shrink-0"
                       onClick={() => handleMarkDose(medicine, 'skipped')}
                     >
                       <X className="mr-2 h-5 w-5" />
