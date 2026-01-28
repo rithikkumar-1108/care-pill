@@ -6,9 +6,10 @@ interface QuickStatsProps {
   takenToday: number;
   pendingToday: number;
   missedToday: number;
+  skippedToday: number;
 }
 
-export function QuickStats({ totalMedicines, takenToday, pendingToday, missedToday }: QuickStatsProps) {
+export function QuickStats({ totalMedicines, takenToday, pendingToday, missedToday, skippedToday }: QuickStatsProps) {
   const stats = [
     {
       label: 'Active Medicines',
@@ -32,6 +33,13 @@ export function QuickStats({ totalMedicines, takenToday, pendingToday, missedTod
       bg: 'bg-warning/10',
     },
     {
+      label: 'Skipped',
+      value: skippedToday,
+      icon: XCircle,
+      color: 'text-muted-foreground',
+      bg: 'bg-muted/50',
+    },
+    {
       label: 'Missed',
       value: missedToday,
       icon: XCircle,
@@ -41,7 +49,7 @@ export function QuickStats({ totalMedicines, takenToday, pendingToday, missedTod
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (

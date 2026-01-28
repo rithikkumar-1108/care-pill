@@ -103,8 +103,19 @@ export default function DashboardPage() {
         <QuickStats
           totalMedicines={medicines.length}
           takenToday={doseLogs.filter((l) => l.status === 'taken').length}
-          pendingToday={doseLogs.filter((l) => l.status === 'pending').length}
+          pendingToday={
+            // Count medicines assigned to sessions that don't have a 'taken', 'skipped', or 'missed' log
+            sessions.reduce((count, sessionType) => {
+              const sessionMedicines = getMedicinesForSession(sessionType);
+              const sessionLogs = getDoseLogsForSession(sessionType);
+              return count + sessionMedicines.filter((med) => {
+                const log = sessionLogs.find((l) => l.medicine_id === med.id);
+                return !log || log.status === 'pending';
+              }).length;
+            }, 0)
+          }
           missedToday={doseLogs.filter((l) => l.status === 'missed').length}
+          skippedToday={doseLogs.filter((l) => l.status === 'skipped').length}
         />
 
         {/* Session Cards */}
