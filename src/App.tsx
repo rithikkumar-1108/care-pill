@@ -12,6 +12,8 @@ import MedicinesPage from "./pages/Medicines";
 import CalendarPage from "./pages/Calendar";
 import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
+import CaregiverDashboardPage from "./pages/CaregiverDashboard";
+import AcceptInvitePage from "./pages/AcceptInvite";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,11 +29,13 @@ const App = () => (
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/accept-invite" element={<AcceptInvitePage />} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/medicines" element={<ProtectedRoute><MedicinesPage /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+            <Route path="/caregiver" element={<ProtectedRoute><CaregiverDashboardPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

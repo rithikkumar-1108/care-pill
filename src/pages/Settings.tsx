@@ -15,9 +15,11 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, User, Clock, Users, Save } from 'lucide-react';
+import { Loader2, User, Clock, Users, Save, UserPlus } from 'lucide-react';
 import type { SessionSchedule, SessionType } from '@/types/database';
 import { SESSION_INFO } from '@/types/database';
+import { InviteCaregiverDialog } from '@/components/caregiver/InviteCaregiverDialog';
+import { LinkedCaregiversList } from '@/components/caregiver/LinkedCaregiversList';
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -379,6 +381,31 @@ export default function SettingsPage() {
               <Save className="mr-2 h-5 w-5" />
               {isSaving ? 'Saving...' : 'Save Caregiver Info'}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Invite Caregiver Portal Access */}
+        <Card className="card-warm">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-success/10 rounded-xl">
+                <UserPlus className="w-6 h-6 text-success" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Caregiver Portal Access</CardTitle>
+                <CardDescription>
+                  Invite caregivers to view your medicine schedule and adherence
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <p className="text-muted-foreground">
+              Give your family members or healthcare providers read-only access to monitor your 
+              medicine adherence and receive alerts when doses are missed.
+            </p>
+            <InviteCaregiverDialog />
+            <LinkedCaregiversList />
           </CardContent>
         </Card>
       </div>
