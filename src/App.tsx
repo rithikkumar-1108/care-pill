@@ -13,6 +13,7 @@ import CalendarPage from "./pages/Calendar";
 import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import CaregiverDashboardPage from "./pages/CaregiverDashboard";
+import CaregiverLoginPage from "./pages/CaregiverLogin";
 import AcceptInvitePage from "./pages/AcceptInvite";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/caregiver-login" element={<CaregiverLoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/accept-invite" element={<AcceptInvitePage />} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

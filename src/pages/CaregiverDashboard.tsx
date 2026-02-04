@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
-import { Loader2, User, Pill, CheckCircle, XCircle, Clock, AlertTriangle, Package } from 'lucide-react';
+import { format, subDays } from 'date-fns';
+import { 
+  Loader2, User, Pill, CheckCircle, XCircle, Clock, AlertTriangle, 
+  Package, Activity, Calendar, TrendingUp, Heart 
+} from 'lucide-react';
 import type { SessionType, Medicine, DoseLogWithMedicine, Profile } from '@/types/database';
 
 interface LinkedPatient {
@@ -23,18 +27,63 @@ interface PatientDashboardData {
     pending: number;
     missed: number;
     skipped: number;
+    total: number;
   };
+  weeklyAdherence: number;
   lowStockMedicines: Medicine[];
 }
 
+type PatientStatus = 'excellent' | 'good' | 'needs_attention' | 'critical';
+
+function getPatientStatus(adherence: number, missedToday: number): PatientStatus {
+  if (adherence >= 90 && missedToday === 0) return 'excellent';
+  if (adherence >= 70 && missedToday <= 1) return 'good';
+  if (adherence >= 50) return 'needs_attention';
+  return 'critical';
+}
+
+function getStatusInfo(status: PatientStatus) {
+  switch (status) {
+    case 'excellent':
+      return { 
+        label: 'Excellent', 
+        color: 'text-success border-success bg-success/10',
+        icon: Heart,
+        message: 'Taking all medications on time'
+      };
+    case 'good':
+      return { 
+        label: 'Good', 
+        color: 'text-primary border-primary bg-primary/10',
+        icon: TrendingUp,
+        message: 'Mostly following the schedule'
+      };
+    case 'needs_attention':
+      return { 
+        label: 'Needs Attention', 
+        color: 'text-warning border-warning bg-warning/10',
+        icon: AlertTriangle,
+        message: 'Some doses being missed'
+      };
+    case 'critical':
+      return { 
+        label: 'Critical', 
+        color: 'text-destructive border-destructive bg-destructive/10',
+        icon: XCircle,
+        message: 'Many doses missed - please check in'
+      };
+  }
+}
+
 export default function CaregiverDashboardPage() {
-  const { user } = useAuth();
+  const { user, isCaregiver } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [linkedPatients, setLinkedPatients] = useState<LinkedPatient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<LinkedPatient | null>(null);
   const [patientData, setPatientData] = useState<PatientDashboardData | null>(null);
 
   const today = format(new Date(), 'yyyy-MM-dd');
+  const weekAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
   useEffect(() => {
     fetchLinkedPatients();
@@ -53,7 +102,6 @@ export default function CaregiverDashboardPage() {
       if (error) throw error;
 
       if (links && links.length > 0) {
-        // Fetch profiles for each patient
         const patientIds = links.map(l => l.patient_id);
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
@@ -87,7 +135,7 @@ export default function CaregiverDashboardPage() {
 
   const fetchPatientData = async (patientId: string) => {
     try {
-      const [medicinesRes, logsRes] = await Promise.all([
+      const [medicinesRes, logsRes, weeklyLogsRes] = await Promise.all([
         supabase
           .from('medicines')
           .select('*')
@@ -98,17 +146,35 @@ export default function CaregiverDashboardPage() {
           .select('*, medicine:medicines(*)')
           .eq('user_id', patientId)
           .eq('scheduled_date', today),
+        supabase
+          .from('dose_logs')
+          .select('status')
+          .eq('user_id', patientId)
+          .gte('scheduled_date', weekAgo)
+          .lte('scheduled_date', today),
       ]);
 
       const medicines = (medicinesRes.data || []) as Medicine[];
       const doseLogs = (logsRes.data || []) as DoseLogWithMedicine[];
+      const weeklyLogs = weeklyLogsRes.data || [];
+
+      const takenCount = doseLogs.filter(l => l.status === 'taken').length;
+      const pendingCount = doseLogs.filter(l => l.status === 'pending').length;
+      const missedCount = doseLogs.filter(l => l.status === 'missed').length;
+      const skippedCount = doseLogs.filter(l => l.status === 'skipped').length;
 
       const todayStats = {
-        taken: doseLogs.filter(l => l.status === 'taken').length,
-        pending: doseLogs.filter(l => l.status === 'pending').length,
-        missed: doseLogs.filter(l => l.status === 'missed').length,
-        skipped: doseLogs.filter(l => l.status === 'skipped').length,
+        taken: takenCount,
+        pending: pendingCount,
+        missed: missedCount,
+        skipped: skippedCount,
+        total: doseLogs.length,
       };
+
+      // Calculate weekly adherence
+      const weeklyTaken = weeklyLogs.filter(l => l.status === 'taken').length;
+      const weeklyTotal = weeklyLogs.length;
+      const weeklyAdherence = weeklyTotal > 0 ? Math.round((weeklyTaken / weeklyTotal) * 100) : 100;
 
       const lowStockMedicines = medicines.filter(m => m.stock_quantity <= m.low_stock_threshold);
 
@@ -116,6 +182,7 @@ export default function CaregiverDashboardPage() {
         medicines,
         doseLogs,
         todayStats,
+        weeklyAdherence,
         lowStockMedicines,
       });
     } catch (error) {
@@ -148,6 +215,12 @@ export default function CaregiverDashboardPage() {
     );
   }
 
+  const patientStatus = patientData 
+    ? getPatientStatus(patientData.weeklyAdherence, patientData.todayStats.missed)
+    : 'good';
+  const statusInfo = getStatusInfo(patientStatus);
+  const StatusIcon = statusInfo.icon;
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -155,7 +228,7 @@ export default function CaregiverDashboardPage() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Caregiver Dashboard 👨‍⚕️</h1>
           <p className="text-lg text-muted-foreground">
-            Monitor your patients' medicine adherence
+            Monitor your patients' medicine adherence and health status
           </p>
         </div>
 
@@ -178,23 +251,65 @@ export default function CaregiverDashboardPage() {
 
         {selectedPatient && patientData && (
           <>
-            {/* Patient Info Card */}
+            {/* Patient Info Card with Status */}
+            <Card className="card-warm overflow-hidden">
+              <div className={`h-2 ${patientStatus === 'excellent' ? 'bg-success' : patientStatus === 'good' ? 'bg-primary' : patientStatus === 'needs_attention' ? 'bg-warning' : 'bg-destructive'}`} />
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl">{selectedPatient.profile?.full_name}</CardTitle>
+                      <CardDescription className="text-base">
+                        {selectedPatient.profile?.age && `${selectedPatient.profile.age} years old`}
+                        {selectedPatient.profile?.age && selectedPatient.profile?.gender && ' • '}
+                        {selectedPatient.profile?.gender && `${selectedPatient.profile.gender}`}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Badge className={`${statusInfo.color} text-lg px-4 py-2 flex items-center gap-2`}>
+                    <StatusIcon className="h-5 w-5" />
+                    {statusInfo.label}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  {statusInfo.message}
+                </p>
+                {selectedPatient.profile?.health_condition && (
+                  <div className="p-3 bg-muted/30 rounded-xl">
+                    <p className="text-sm text-muted-foreground">Health Condition</p>
+                    <p className="font-medium">{selectedPatient.profile.health_condition}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Weekly Adherence */}
             <Card className="card-warm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-2xl">
-                  <User className="h-8 w-8 text-primary" />
-                  {selectedPatient.profile?.full_name}
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Weekly Adherence
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {selectedPatient.profile?.age && (
-                  <p className="text-muted-foreground">Age: {selectedPatient.profile.age}</p>
-                )}
-                {selectedPatient.profile?.health_condition && (
-                  <p className="text-muted-foreground">
-                    Health Condition: {selectedPatient.profile.health_condition}
-                  </p>
-                )}
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Last 7 days</span>
+                  <span className="text-2xl font-bold">{patientData.weeklyAdherence}%</span>
+                </div>
+                <Progress value={patientData.weeklyAdherence} className="h-3" />
+                <p className="text-sm text-muted-foreground">
+                  {patientData.weeklyAdherence >= 80 
+                    ? 'Great adherence! Keep up the good work.'
+                    : patientData.weeklyAdherence >= 60
+                    ? 'Room for improvement. Consider setting reminders.'
+                    : 'Low adherence. Please check in with your patient.'}
+                </p>
               </CardContent>
             </Card>
 
@@ -290,12 +405,17 @@ export default function CaregiverDashboardPage() {
             {/* Today's Dose Log */}
             <Card className="card-warm">
               <CardHeader>
-                <CardTitle className="text-xl">Today's Dose Log</CardTitle>
+                <CardTitle className="text-xl">Today's Medicine Schedule</CardTitle>
+                <CardDescription>
+                  {patientData.todayStats.total > 0 
+                    ? `${patientData.todayStats.taken} of ${patientData.todayStats.total} doses completed`
+                    : 'No doses scheduled for today'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {patientData.doseLogs.length === 0 ? (
                   <p className="text-muted-foreground text-center py-6">
-                    No dose logs for today yet.
+                    No medicines scheduled for today.
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -305,11 +425,26 @@ export default function CaregiverDashboardPage() {
                         className="flex items-center justify-between p-4 bg-muted/30 rounded-xl"
                       >
                         <div className="flex items-center gap-3">
-                          <Pill className="h-5 w-5 text-primary" />
+                          <div className={`p-2 rounded-full ${
+                            log.status === 'taken' ? 'bg-success/10' :
+                            log.status === 'missed' ? 'bg-destructive/10' :
+                            log.status === 'skipped' ? 'bg-muted' :
+                            'bg-warning/10'
+                          }`}>
+                            {log.status === 'taken' ? (
+                              <CheckCircle className="h-5 w-5 text-success" />
+                            ) : log.status === 'missed' ? (
+                              <XCircle className="h-5 w-5 text-destructive" />
+                            ) : log.status === 'skipped' ? (
+                              <XCircle className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <Clock className="h-5 w-5 text-warning" />
+                            )}
+                          </div>
                           <div>
                             <p className="font-medium">{log.medicine?.name}</p>
                             <p className="text-sm text-muted-foreground capitalize">
-                              {log.session_type} session
+                              {log.session_type} • {log.medicine?.dosage} {log.medicine?.dosage_unit}
                             </p>
                           </div>
                         </div>
@@ -324,7 +459,9 @@ export default function CaregiverDashboardPage() {
                               : 'status-pending'
                           }
                         >
-                          {log.status}
+                          {log.status === 'taken' && log.taken_at 
+                            ? `Taken at ${format(new Date(log.taken_at), 'h:mm a')}`
+                            : log.status}
                         </Badge>
                       </div>
                     ))}
@@ -333,10 +470,13 @@ export default function CaregiverDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Medicine List */}
+            {/* Active Medicines */}
             <Card className="card-warm">
               <CardHeader>
                 <CardTitle className="text-xl">Active Medicines</CardTitle>
+                <CardDescription>
+                  {patientData.medicines.length} medicine{patientData.medicines.length !== 1 ? 's' : ''} being tracked
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -346,24 +486,33 @@ export default function CaregiverDashboardPage() {
                       className="flex items-center justify-between p-4 bg-muted/30 rounded-xl"
                     >
                       <div className="flex items-center gap-3">
-                        <Pill className="h-5 w-5 text-primary" />
+                        <div className="p-2 rounded-full bg-primary/10">
+                          <Pill className="h-5 w-5 text-primary" />
+                        </div>
                         <div>
                           <p className="font-medium">{med.name}</p>
                           <p className="text-sm text-muted-foreground">
                             {med.dosage} {med.dosage_unit}
                           </p>
+                          {med.instructions && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {med.instructions}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={
-                          med.stock_quantity <= med.low_stock_threshold
-                            ? 'text-warning border-warning'
-                            : 'text-success border-success'
-                        }
-                      >
-                        Stock: {med.stock_quantity}
-                      </Badge>
+                      <div className="text-right">
+                        <Badge
+                          variant="outline"
+                          className={
+                            med.stock_quantity <= med.low_stock_threshold
+                              ? 'text-warning border-warning'
+                              : 'text-success border-success'
+                          }
+                        >
+                          Stock: {med.stock_quantity}
+                        </Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
