@@ -20,6 +20,7 @@ import type { SessionSchedule, SessionType } from '@/types/database';
 import { SESSION_INFO } from '@/types/database';
 import { InviteCaregiverDialog } from '@/components/caregiver/InviteCaregiverDialog';
 import { LinkedCaregiversList } from '@/components/caregiver/LinkedCaregiversList';
+ import { PendingCaregiverRequests } from '@/components/caregiver/PendingCaregiverRequests';
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -405,6 +406,7 @@ export default function SettingsPage() {
               medicine adherence and receive alerts when doses are missed.
             </p>
             <InviteCaregiverDialog />
+             <PendingCaregiverRequests />
             <LinkedCaregiversList />
           </CardContent>
         </Card>
