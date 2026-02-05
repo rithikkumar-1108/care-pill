@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -88,6 +89,57 @@ export default function CaregiverDashboardPage() {
   useEffect(() => {
     fetchLinkedPatients();
   }, [user]);
+
+  // Set up real-time subscriptions for the selected patient
+  useEffect(() => {
+    if (!selectedPatient) return;
+
+    const patientId = selectedPatient.patient_id;
+
+    // Subscribe to dose_logs changes
+    const doseLogsChannel = supabase
+      .channel(`dose_logs_${patientId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'dose_logs',
+          filter: `user_id=eq.${patientId}`,
+        },
+        (payload) => {
+          console.log('Dose log change:', payload);
+          // Refetch patient data on any change
+          fetchPatientData(patientId);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to medicines changes
+    const medicinesChannel = supabase
+      .channel(`medicines_${patientId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'medicines',
+          filter: `user_id=eq.${patientId}`,
+        },
+        (payload) => {
+          console.log('Medicine change:', payload);
+          // Refetch patient data on any change
+          fetchPatientData(patientId);
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount or patient change
+    return () => {
+      supabase.removeChannel(doseLogsChannel);
+      supabase.removeChannel(medicinesChannel);
+    };
+  }, [selectedPatient]);
 
   const fetchLinkedPatients = async () => {
     if (!user) return;
@@ -228,7 +280,7 @@ export default function CaregiverDashboardPage() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Caregiver Dashboard 👨‍⚕️</h1>
           <p className="text-lg text-muted-foreground">
-            Monitor your patients' medicine adherence and health status
+             Monitor your patients' medicine adherence in real-time
           </p>
         </div>
 
