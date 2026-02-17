@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import type { SessionType, DoseLogWithMedicine, SessionSchedule, Medicine, MedicineSession } from '@/types/database';
 import { Loader2 } from 'lucide-react';
+import { ChatBot } from '@/components/chat/ChatBot';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -135,6 +136,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      <ChatBot />
     </AppLayout>
   );
 }
