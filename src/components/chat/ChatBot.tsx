@@ -1,26 +1,60 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageCircle, X, Send, Loader2, Bot, User } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Bot, User, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const WELCOME_MSG: Msg = { role: 'assistant', content: "Hi! I'm your CarePill Assistant 💊. Ask me anything about your medications or health!" };
 
 export function ChatBot() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', content: "Hi! I'm your CarePill Assistant 💊. Ask me anything about your medications or health!" },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([WELCOME_MSG]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load history on first open
+  useEffect(() => {
+    if (!open || historyLoaded || !user) return;
+    (async () => {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('role, content')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(100);
+      if (data && data.length > 0) {
+        setMessages([WELCOME_MSG, ...(data as Msg[])]);
+      }
+      setHistoryLoaded(true);
+    })();
+  }, [open, historyLoaded, user]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const persistMsg = useCallback(async (msg: Msg) => {
+    if (!user) return;
+    await supabase.from('chat_messages').insert({ user_id: user.id, role: msg.role, content: msg.content });
+  }, [user]);
+
+  const clearHistory = async () => {
+    if (!user) return;
+    await supabase.from('chat_messages').delete().eq('user_id', user.id);
+    setMessages([WELCOME_MSG]);
+    toast({ title: 'Chat cleared' });
+  };
 
   const send = async () => {
     const text = input.trim();
@@ -30,9 +64,9 @@ export function ChatBot() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
+    await persistMsg(userMsg);
 
     let assistantSoFar = '';
-
     const upsertAssistant = (chunk: string) => {
       assistantSoFar += chunk;
       setMessages((prev) => {
@@ -51,9 +85,8 @@ export function ChatBot() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: [...messages, userMsg] }),
+        body: JSON.stringify({ messages: messages.filter((m) => m !== WELCOME_MSG).concat(userMsg) }),
       });
-
       if (!resp.ok || !resp.body) throw new Error('Stream failed');
 
       const reader = resp.body.getReader();
@@ -64,7 +97,6 @@ export function ChatBot() {
         const { done, value } = await reader.read();
         if (done) break;
         textBuffer += decoder.decode(value, { stream: true });
-
         let newlineIndex: number;
         while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
           let line = textBuffer.slice(0, newlineIndex);
@@ -86,15 +118,19 @@ export function ChatBot() {
       }
     } catch (e) {
       console.error(e);
-      upsertAssistant("Sorry, I couldn't process that. Please try again.");
+      assistantSoFar = "Sorry, I couldn't process that. Please try again.";
+      upsertAssistant('');
     }
 
+    // Persist final assistant message
+    if (assistantSoFar) {
+      await persistMsg({ role: 'assistant', content: assistantSoFar });
+    }
     setIsLoading(false);
   };
 
   return (
     <>
-      {/* Floating button */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -105,21 +141,23 @@ export function ChatBot() {
         </button>
       )}
 
-      {/* Chat panel */}
       {open && (
         <div className="fixed bottom-6 right-6 z-50 flex h-[500px] w-[380px] flex-col rounded-2xl border bg-background shadow-2xl overflow-hidden">
-          {/* Header */}
           <div className="flex items-center justify-between bg-primary px-4 py-3 text-primary-foreground">
             <div className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
               <span className="font-semibold">CarePill Assistant</span>
             </div>
-            <button onClick={() => setOpen(false)} className="hover:opacity-80">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button onClick={clearHistory} className="hover:opacity-80 p-1" title="Clear history">
+                <Trash2 className="h-4 w-4" />
+              </button>
+              <button onClick={() => setOpen(false)} className="hover:opacity-80 p-1">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
-          {/* Messages */}
           <ScrollArea className="flex-1 px-4 py-3">
             <div className="space-y-4">
               {messages.map((m, i) => (
@@ -129,20 +167,12 @@ export function ChatBot() {
                       <Bot className="h-4 w-4" />
                     </div>
                   )}
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                      m.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-br-sm'
-                        : 'bg-muted text-foreground rounded-bl-sm'
-                    }`}
-                  >
+                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${m.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'}`}>
                     {m.role === 'assistant' ? (
                       <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0">
                         <ReactMarkdown>{m.content}</ReactMarkdown>
                       </div>
-                    ) : (
-                      m.content
-                    )}
+                    ) : m.content}
                   </div>
                   {m.role === 'user' && (
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -165,22 +195,9 @@ export function ChatBot() {
             </div>
           </ScrollArea>
 
-          {/* Input */}
           <div className="border-t px-3 py-2">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                send();
-              }}
-              className="flex gap-2"
-            >
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about your medications..."
-                className="flex-1 rounded-full text-sm"
-                disabled={isLoading}
-              />
+            <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
+              <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about your medications..." className="flex-1 rounded-full text-sm" disabled={isLoading} />
               <Button type="submit" size="icon" className="h-9 w-9 rounded-full" disabled={isLoading || !input.trim()}>
                 <Send className="h-4 w-4" />
               </Button>
