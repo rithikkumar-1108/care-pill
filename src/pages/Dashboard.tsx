@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import type { SessionType, DoseLogWithMedicine, SessionSchedule, Medicine, MedicineSession } from '@/types/database';
 import { Loader2 } from 'lucide-react';
 import { ChatBot } from '@/components/chat/ChatBot';
+import { InteractionChecker } from '@/components/medicines/InteractionChecker';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -91,13 +92,16 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Welcome Header */}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">
-            Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}, {profile?.full_name?.split(' ')[0] || 'there'}! 👋
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            {format(new Date(), 'EEEE, MMMM do, yyyy')}
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-foreground">
+              Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}, {profile?.full_name?.split(' ')[0] || 'there'}! 👋
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              {format(new Date(), 'EEEE, MMMM do, yyyy')}
+            </p>
+          </div>
+          <InteractionChecker />
         </div>
 
         {/* Quick Stats */}
