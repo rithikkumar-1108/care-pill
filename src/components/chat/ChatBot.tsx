@@ -13,6 +13,14 @@ type Msg = { role: 'user' | 'assistant'; content: string };
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const WELCOME_MSG: Msg = { role: 'assistant', content: "Hi! I'm your CarePill Assistant 💊. Ask me anything about your medications or health!" };
 
+const QUICK_REPLIES = [
+  "What are common side effects of my medications?",
+  "Tips for remembering to take my medicine",
+  "What should I do if I miss a dose?",
+  "Can I take my medicines with food?",
+  "How to store medications properly?",
+];
+
 export function ChatBot() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -56,13 +64,13 @@ export function ChatBot() {
     toast({ title: 'Chat cleared' });
   };
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
+    if (!overrideText) setInput('');
 
     const userMsg: Msg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
-    setInput('');
     setIsLoading(true);
     await persistMsg(userMsg);
 
@@ -181,6 +189,19 @@ export function ChatBot() {
                   )}
                 </div>
               ))}
+              {!isLoading && messages.length === 1 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {QUICK_REPLIES.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => send(q)}
+                      className="rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 transition-colors text-left"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className="flex gap-2">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
