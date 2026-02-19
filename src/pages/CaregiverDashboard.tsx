@@ -13,6 +13,7 @@ import {
   Package, Activity, Calendar, TrendingUp, Heart 
 } from 'lucide-react';
 import type { SessionType, Medicine, DoseLogWithMedicine, Profile } from '@/types/database';
+import { ChatBot } from '@/components/chat/ChatBot';
 
 interface LinkedPatient {
   id: string;
@@ -573,6 +574,7 @@ export default function CaregiverDashboardPage() {
           </>
         )}
       </div>
+      <ChatBot />
     </AppLayout>
   );
 }
