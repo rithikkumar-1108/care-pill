@@ -9,6 +9,8 @@ import type { SessionType, DoseLogWithMedicine, SessionSchedule, Medicine, Medic
 import { Loader2 } from 'lucide-react';
 import { ChatBot } from '@/components/chat/ChatBot';
 import { InteractionChecker } from '@/components/medicines/InteractionChecker';
+import { ReminderSettings } from '@/components/reminders/ReminderSettings';
+import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
