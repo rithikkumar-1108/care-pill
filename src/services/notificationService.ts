@@ -1,6 +1,16 @@
 // Local browser notification service for medicine reminders
 // Works offline, no external API dependencies
 
+export type SoundStyle = 'gentle' | 'loud' | 'vibrate_only';
+
+export function getSoundStyle(): SoundStyle {
+  return (localStorage.getItem('meditrack-sound-style') as SoundStyle) || 'gentle';
+}
+
+export function setSoundStyle(style: SoundStyle): void {
+  localStorage.setItem('meditrack-sound-style', style);
+}
+
 export interface ReminderConfig {
   medicineId: string;
   medicineName: string;
@@ -49,42 +59,66 @@ export function getNotificationPermissionStatus(): NotificationPermission | 'uns
   return Notification.permission;
 }
 
-// Play a short alert sound + vibrate
+// Play a short alert sound + vibrate based on user's chosen style
 function playAlertSound(isMissed = false) {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+  const style = getSoundStyle();
 
-    if (isMissed) {
-      // Urgent double-beep for missed dose
-      osc.frequency.value = 880;
-      osc.type = 'square';
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.4);
-    } else {
-      // Gentle chime for reminders
-      osc.frequency.value = 660;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
+  // Sound
+  if (style !== 'vibrate_only') {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const volume = style === 'loud' ? 0.6 : 0.2;
+
+      if (isMissed) {
+        osc.frequency.value = style === 'loud' ? 1000 : 880;
+        osc.type = style === 'loud' ? 'sawtooth' : 'square';
+        gain.gain.setValueAtTime(volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(volume, ctx.currentTime + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        if (style === 'loud') {
+          gain.gain.setValueAtTime(volume, ctx.currentTime + 0.5);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.7);
+        }
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + (style === 'loud' ? 0.7 : 0.4));
+      } else {
+        osc.frequency.value = style === 'loud' ? 800 : 660;
+        osc.type = 'sine';
+        const duration = style === 'loud' ? 0.5 : 0.3;
+        gain.gain.setValueAtTime(volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + duration);
+      }
+    } catch {
+      // AudioContext not available
     }
-  } catch {
-    // AudioContext not available — silently skip
   }
 
-  // Vibrate if supported (mobile devices)
+  // Vibrate (always for vibrate_only, otherwise based on context)
   if ('vibrate' in navigator) {
-    navigator.vibrate(isMissed ? [200, 100, 200] : [150]);
+    if (style === 'vibrate_only') {
+      navigator.vibrate(isMissed ? [300, 150, 300, 150, 300] : [200, 100, 200]);
+    } else if (style === 'loud') {
+      navigator.vibrate(isMissed ? [200, 100, 200, 100, 200] : [200]);
+    } else {
+      navigator.vibrate(isMissed ? [200, 100, 200] : [150]);
+    }
   }
+}
+
+// Preview sound for settings UI
+export function previewSound(style: SoundStyle): void {
+  const prev = getSoundStyle();
+  localStorage.setItem('meditrack-sound-style', style);
+  playAlertSound(false);
+  localStorage.setItem('meditrack-sound-style', prev);
 }
 
 function showNotification(title: string, body: string, tag: string, isMissed = false) {
