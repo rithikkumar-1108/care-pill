@@ -146,6 +146,7 @@ export function scheduleReminders(
         '❌ Missed Dose',
         `You missed ${config.medicineName} ${config.dosage}${config.dosageUnit} scheduled at ${timeStr}.`,
         `${tag}-missed`,
+        true,
       );
       onMarkMissed();
     }, missDelay);
