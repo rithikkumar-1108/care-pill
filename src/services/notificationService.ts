@@ -1,6 +1,16 @@
 // Local browser notification service for medicine reminders
 // Works offline, no external API dependencies
 
+export type SoundStyle = 'gentle' | 'loud' | 'vibrate_only';
+
+export function getSoundStyle(): SoundStyle {
+  return (localStorage.getItem('meditrack-sound-style') as SoundStyle) || 'gentle';
+}
+
+export function setSoundStyle(style: SoundStyle): void {
+  localStorage.setItem('meditrack-sound-style', style);
+}
+
 export interface ReminderConfig {
   medicineId: string;
   medicineName: string;
