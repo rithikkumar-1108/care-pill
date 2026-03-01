@@ -120,8 +120,10 @@ export default function DashboardPage() {
               {format(new Date(), 'EEEE, MMMM do, yyyy')}
             </p>
           </div>
-          <InteractionChecker />
-        </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <ReminderSettings remindersEnabled={remindersEnabled} onToggle={handleRemindersToggle} />
+            <InteractionChecker />
+          </div>
 
         {/* Quick Stats */}
         <QuickStats
