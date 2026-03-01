@@ -49,18 +49,58 @@ export function getNotificationPermissionStatus(): NotificationPermission | 'uns
   return Notification.permission;
 }
 
-function showNotification(title: string, body: string, tag: string, actions?: { taken: () => void; skip: () => void }) {
+// Play a short alert sound + vibrate
+function playAlertSound(isMissed = false) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (isMissed) {
+      // Urgent double-beep for missed dose
+      osc.frequency.value = 880;
+      osc.type = 'square';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } else {
+      // Gentle chime for reminders
+      osc.frequency.value = 660;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    }
+  } catch {
+    // AudioContext not available — silently skip
+  }
+
+  // Vibrate if supported (mobile devices)
+  if ('vibrate' in navigator) {
+    navigator.vibrate(isMissed ? [200, 100, 200] : [150]);
+  }
+}
+
+function showNotification(title: string, body: string, tag: string, isMissed = false) {
+  // Play sound & vibrate regardless of notification permission
+  playAlertSound(isMissed);
+
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
   const notification = new Notification(title, {
     body,
     icon: '/favicon.ico',
-    tag, // Replaces previous notification with same tag
+    tag,
     requireInteraction: true,
+    silent: true, // We handle sound ourselves
   });
 
-  // Browser Notification API doesn't support action buttons natively outside service workers.
-  // We'll handle actions via the in-app UI instead.
   notification.onclick = () => {
     window.focus();
     notification.close();
@@ -92,7 +132,7 @@ export function scheduleReminders(
 
     if (delay > 0) {
       const timeoutId = setTimeout(() => {
-        showNotification(msg.title, msg.body, tag, { taken: onMarkTaken, skip: onMarkSkipped });
+        showNotification(msg.title, msg.body, tag);
       }, delay);
       reminders.push({ timeoutId, type: msg.offset < 0 ? 'pre' : msg.offset === 0 ? 'on-time' : 'post' });
     }
@@ -106,6 +146,7 @@ export function scheduleReminders(
         '❌ Missed Dose',
         `You missed ${config.medicineName} ${config.dosage}${config.dosageUnit} scheduled at ${timeStr}.`,
         `${tag}-missed`,
+        true,
       );
       onMarkMissed();
     }, missDelay);
