@@ -68,6 +68,13 @@ export default function DashboardPage() {
     setIsLoading(false);
   };
 
+  // Schedule local notifications when reminders are enabled
+  useReminderScheduler(
+    remindersEnabled
+      ? { medicines, medicineSessions, schedules, doseLogs, onUpdate: fetchData }
+      : { medicines: [], medicineSessions: [], schedules: [], doseLogs: [], onUpdate: fetchData },
+  );
+
   useEffect(() => {
     fetchData();
   }, [user]);
