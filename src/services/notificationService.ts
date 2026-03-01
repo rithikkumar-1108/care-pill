@@ -132,7 +132,7 @@ export function scheduleReminders(
 
     if (delay > 0) {
       const timeoutId = setTimeout(() => {
-        showNotification(msg.title, msg.body, tag, { taken: onMarkTaken, skip: onMarkSkipped });
+        showNotification(msg.title, msg.body, tag);
       }, delay);
       reminders.push({ timeoutId, type: msg.offset < 0 ? 'pre' : msg.offset === 0 ? 'on-time' : 'post' });
     }
