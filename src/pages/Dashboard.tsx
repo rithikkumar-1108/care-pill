@@ -124,6 +124,7 @@ export default function DashboardPage() {
             <ReminderSettings remindersEnabled={remindersEnabled} onToggle={handleRemindersToggle} />
             <InteractionChecker />
           </div>
+        </div>
 
         {/* Quick Stats */}
         <QuickStats
