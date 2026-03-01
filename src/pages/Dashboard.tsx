@@ -19,8 +19,23 @@ export default function DashboardPage() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [medicineSessions, setMedicineSessions] = useState<MedicineSession[]>([]);
   const [doseLogs, setDoseLogs] = useState<DoseLogWithMedicine[]>([]);
+  const [remindersEnabled, setRemindersEnabled] = useState(() => {
+    return localStorage.getItem('meditrack-reminders') === 'true';
+  });
 
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  const handleRemindersToggle = (enabled: boolean) => {
+    setRemindersEnabled(enabled);
+    localStorage.setItem('meditrack-reminders', String(enabled));
+  };
+
+  // Schedule local notifications when reminders are enabled
+  useReminderScheduler(
+    remindersEnabled
+      ? { medicines, medicineSessions, schedules, doseLogs, onUpdate: fetchData }
+      : { medicines: [], medicineSessions: [], schedules: [], doseLogs: [], onUpdate: fetchData },
+  );
 
   const fetchData = async () => {
     if (!user) return;
