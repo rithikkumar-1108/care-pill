@@ -9,6 +9,8 @@ import type { SessionType, DoseLogWithMedicine, SessionSchedule, Medicine, Medic
 import { Loader2 } from 'lucide-react';
 import { ChatBot } from '@/components/chat/ChatBot';
 import { InteractionChecker } from '@/components/medicines/InteractionChecker';
+import { ReminderSettings } from '@/components/reminders/ReminderSettings';
+import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -17,8 +19,18 @@ export default function DashboardPage() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [medicineSessions, setMedicineSessions] = useState<MedicineSession[]>([]);
   const [doseLogs, setDoseLogs] = useState<DoseLogWithMedicine[]>([]);
+  const [remindersEnabled, setRemindersEnabled] = useState(() => {
+    return localStorage.getItem('meditrack-reminders') === 'true';
+  });
 
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  const handleRemindersToggle = (enabled: boolean) => {
+    setRemindersEnabled(enabled);
+    localStorage.setItem('meditrack-reminders', String(enabled));
+  };
+
+  
 
   const fetchData = async () => {
     if (!user) return;
@@ -55,6 +67,13 @@ export default function DashboardPage() {
     }
     setIsLoading(false);
   };
+
+  // Schedule local notifications when reminders are enabled
+  useReminderScheduler(
+    remindersEnabled
+      ? { medicines, medicineSessions, schedules, doseLogs, onUpdate: fetchData }
+      : { medicines: [], medicineSessions: [], schedules: [], doseLogs: [], onUpdate: fetchData },
+  );
 
   useEffect(() => {
     fetchData();
@@ -101,7 +120,10 @@ export default function DashboardPage() {
               {format(new Date(), 'EEEE, MMMM do, yyyy')}
             </p>
           </div>
-          <InteractionChecker />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <ReminderSettings remindersEnabled={remindersEnabled} onToggle={handleRemindersToggle} />
+            <InteractionChecker />
+          </div>
         </div>
 
         {/* Quick Stats */}
