@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Bell, BellOff, BellRing, Info } from 'lucide-react';
+import { Bell, BellOff, BellRing, Info, Volume1, Volume2, Vibrate, Play } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,17 +15,29 @@ import {
 import {
   requestNotificationPermission,
   getNotificationPermissionStatus,
+  getSoundStyle,
+  setSoundStyle,
+  previewSound,
+  type SoundStyle,
 } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface ReminderSettingsProps {
   remindersEnabled: boolean;
   onToggle: (enabled: boolean) => void;
 }
 
+const soundOptions: { value: SoundStyle; label: string; description: string; icon: React.ReactNode }[] = [
+  { value: 'gentle', label: 'Gentle', description: 'Soft chime, light vibration', icon: <Volume1 className="h-5 w-5" /> },
+  { value: 'loud', label: 'Loud', description: 'Strong alert, heavy vibration', icon: <Volume2 className="h-5 w-5" /> },
+  { value: 'vibrate_only', label: 'Vibrate Only', description: 'No sound, vibration only', icon: <Vibrate className="h-5 w-5" /> },
+];
+
 export function ReminderSettings({ remindersEnabled, onToggle }: ReminderSettingsProps) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [selectedSound, setSelectedSound] = useState<SoundStyle>(getSoundStyle);
   const permissionStatus = getNotificationPermissionStatus();
 
   const handleEnable = async () => {
@@ -49,6 +61,12 @@ export function ReminderSettings({ remindersEnabled, onToggle }: ReminderSetting
       onToggle(false);
       toast({ title: 'Reminders Disabled', description: 'You will no longer receive notifications.' });
     }
+  };
+
+  const handleSoundChange = (style: SoundStyle) => {
+    setSelectedSound(style);
+    setSoundStyle(style);
+    toast({ title: `Sound: ${style.charAt(0).toUpperCase() + style.slice(1).replace('_', ' ')}`, description: 'Notification style updated.' });
   };
 
   return (
@@ -95,6 +113,51 @@ export function ReminderSettings({ remindersEnabled, onToggle }: ReminderSetting
                 onCheckedChange={handleToggle}
                 disabled={permissionStatus === 'unsupported' || permissionStatus === 'denied'}
               />
+            </CardContent>
+          </Card>
+
+          {/* Sound Style Picker */}
+          <Card className="border-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Notification Sound</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {soundOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSoundChange(opt.value)}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left',
+                    selectedSound === opt.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-transparent bg-muted/50 hover:bg-muted',
+                  )}
+                >
+                  <div className={cn(
+                    'p-2 rounded-lg',
+                    selectedSound === opt.value ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/10 text-muted-foreground',
+                  )}>
+                    {opt.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">{opt.label}</p>
+                    <p className="text-sm text-muted-foreground">{opt.description}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      previewSound(opt.value);
+                    }}
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
+                </button>
+              ))}
             </CardContent>
           </Card>
 
