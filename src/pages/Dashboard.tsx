@@ -30,12 +30,7 @@ export default function DashboardPage() {
     localStorage.setItem('meditrack-reminders', String(enabled));
   };
 
-  // Schedule local notifications when reminders are enabled
-  useReminderScheduler(
-    remindersEnabled
-      ? { medicines, medicineSessions, schedules, doseLogs, onUpdate: fetchData }
-      : { medicines: [], medicineSessions: [], schedules: [], doseLogs: [], onUpdate: fetchData },
-  );
+  
 
   const fetchData = async () => {
     if (!user) return;
