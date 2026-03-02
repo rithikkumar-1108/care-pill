@@ -91,6 +91,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchRoles(currentSession.user.id);
       }
       setIsLoading(false);
+    }).catch(() => {
+      // Clear stale session data on fetch failure
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
