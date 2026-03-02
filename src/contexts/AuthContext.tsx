@@ -91,6 +91,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchRoles(currentSession.user.id);
       }
       setIsLoading(false);
+    }).catch(() => {
+      // Clear stale session data on fetch failure
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -111,11 +118,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    } catch (err) {
+      return { error: new Error('Network error. Please check your connection and try again.') };
+    }
   };
 
   const signOut = async () => {
