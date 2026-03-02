@@ -61,14 +61,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Set up auth state listener BEFORE checking session
+    let mounted = true;
+
+    // Check existing session first
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (!mounted) return;
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+
+      if (currentSession?.user) {
+        fetchProfile(currentSession.user.id);
+        fetchRoles(currentSession.user.id);
+      }
+      setIsLoading(false);
+    }).catch(async () => {
+      if (!mounted) return;
+      // Clear stale session that can't be refreshed
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (_) {
+        // Ignore signOut errors
+      }
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setIsLoading(false);
+    });
+
+    // Set up auth state listener for subsequent changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
+        if (!mounted) return;
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          // Use setTimeout to avoid potential deadlock with Supabase client
           setTimeout(() => {
             fetchProfile(currentSession.user.id);
             fetchRoles(currentSession.user.id);
@@ -81,44 +109,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Check existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-
-      if (currentSession?.user) {
-        fetchProfile(currentSession.user.id);
-        fetchRoles(currentSession.user.id);
-      }
-      setIsLoading(false);
-    }).catch(() => {
-      // Clear stale session data on fetch failure
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-      setRoles([]);
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: {
-          full_name: fullName,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            full_name: fullName,
+          },
         },
-      },
-    });
-    return { error };
+      });
+      return { error };
+    } catch (err) {
+      return { error: new Error('Network error. Please check your connection and try again.') };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Clear any stale session before attempting fresh login
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (_) {
+        // Ignore cleanup errors
+      }
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
