@@ -116,21 +116,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: {
-          full_name: fullName,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            full_name: fullName,
+          },
         },
-      },
-    });
-    return { error };
+      });
+      return { error };
+    } catch (err) {
+      return { error: new Error('Network error. Please check your connection and try again.') };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Clear any stale session before attempting fresh login
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (_) {
+        // Ignore cleanup errors
+      }
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
