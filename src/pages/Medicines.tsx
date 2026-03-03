@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, Trash2, Pill, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Pill, Loader2, Clock } from 'lucide-react';
 import type { Medicine, MedicineSession, SessionType } from '@/types/database';
 import { getStockStatus, SESSION_INFO } from '@/types/database';
 import { AddMedicineDialog } from '@/components/medicines/AddMedicineDialog';
@@ -14,8 +14,14 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
+interface MedicineSessionWithTime {
+  session_type: SessionType;
+  custom_time: string | null;
+}
+
 interface MedicineWithSessions extends Medicine {
   sessions: SessionType[];
+  sessionDetails?: MedicineSessionWithTime[];
 }
 
 export default function MedicinesPage() {
@@ -45,12 +51,17 @@ export default function MedicinesPage() {
 
       if (sessionsError) throw sessionsError;
 
-      const medicinesWithSessions = (medicinesData as Medicine[]).map((medicine) => ({
-        ...medicine,
-        sessions: (sessionsData as MedicineSession[])
-          .filter((s) => s.medicine_id === medicine.id)
-          .map((s) => s.session_type),
-      }));
+      const medicinesWithSessions = (medicinesData as Medicine[]).map((medicine) => {
+        const medSessions = (sessionsData as any[]).filter((s) => s.medicine_id === medicine.id);
+        return {
+          ...medicine,
+          sessions: medSessions.map((s) => s.session_type as SessionType),
+          sessionDetails: medSessions.map((s) => ({
+            session_type: s.session_type as SessionType,
+            custom_time: s.custom_time as string | null,
+          })),
+        };
+      });
 
       setMedicines(medicinesWithSessions);
     } catch (error) {
@@ -114,6 +125,15 @@ export default function MedicinesPage() {
     }
   };
 
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return null;
+    try {
+      return format(new Date(`2000-01-01T${timeStr}`), 'h:mm a');
+    } catch {
+      return null;
+    }
+  };
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -135,10 +155,7 @@ export default function MedicinesPage() {
               Manage your medicine schedule and stock
             </p>
           </div>
-          <Button
-            className="btn-elderly bg-primary"
-            onClick={() => setIsAddOpen(true)}
-          >
+          <Button className="btn-elderly bg-primary" onClick={() => setIsAddOpen(true)}>
             <Plus className="mr-2 h-5 w-5" />
             Add Medicine
           </Button>
@@ -149,16 +166,9 @@ export default function MedicinesPage() {
           <Card className="card-warm">
             <CardContent className="py-16 text-center">
               <Pill className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold text-foreground mb-2">
-                No medicines added yet
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Start by adding your first medicine to track
-              </p>
-              <Button
-                className="btn-elderly bg-primary"
-                onClick={() => setIsAddOpen(true)}
-              >
+              <h3 className="text-xl font-semibold text-foreground mb-2">No medicines added yet</h3>
+              <p className="text-muted-foreground mb-6">Start by adding your first medicine to track</p>
+              <Button className="btn-elderly bg-primary" onClick={() => setIsAddOpen(true)}>
                 <Plus className="mr-2 h-5 w-5" />
                 Add Your First Medicine
               </Button>
@@ -182,62 +192,56 @@ export default function MedicinesPage() {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10"
-                        onClick={() => setEditingMedicine(medicine)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => setEditingMedicine(medicine)}>
                         <Edit className="h-5 w-5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(medicine.id)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:text-destructive" onClick={() => handleDelete(medicine.id)}>
                         <Trash2 className="h-5 w-5" />
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Sessions */}
+                  {/* Sessions with custom times */}
                   <div className="flex flex-wrap gap-2">
-                    {medicine.sessions.map((session) => (
-                      <Badge
-                        key={session}
-                        variant="secondary"
-                        className="text-base py-1 px-3"
-                      >
-                        {SESSION_INFO[session].icon} {SESSION_INFO[session].label}
-                      </Badge>
-                    ))}
-                    {medicine.sessions.length === 0 && (
-                      <span className="text-muted-foreground text-sm">
-                        No sessions assigned
-                      </span>
+                    {medicine.sessionDetails && medicine.sessionDetails.length > 0 ? (
+                      medicine.sessionDetails.map((sd) => {
+                        const timeDisplay = formatTime(sd.custom_time);
+                        return (
+                          <Badge key={sd.session_type} variant="secondary" className="text-sm py-1 px-3 gap-1.5">
+                            {SESSION_INFO[sd.session_type].icon} {SESSION_INFO[sd.session_type].label}
+                            {timeDisplay && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                                <Clock className="w-3 h-3" /> {timeDisplay}
+                              </span>
+                            )}
+                          </Badge>
+                        );
+                      })
+                    ) : medicine.sessions.length > 0 ? (
+                      medicine.sessions.map((session) => (
+                        <Badge key={session} variant="secondary" className="text-base py-1 px-3">
+                          {SESSION_INFO[session].icon} {SESSION_INFO[session].label}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-muted-foreground text-sm">No sessions assigned</span>
                     )}
                   </div>
 
-                  {/* Instructions */}
                   {medicine.instructions && (
                     <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
                       {medicine.instructions}
                     </p>
                   )}
 
-                  {/* Duration */}
                   <div className="text-sm text-muted-foreground">
-                    <span>
-                      {format(new Date(medicine.start_date), 'MMM d, yyyy')}
-                    </span>
+                    <span>{format(new Date(medicine.start_date), 'MMM d, yyyy')}</span>
                     {medicine.end_date && (
                       <span> → {format(new Date(medicine.end_date), 'MMM d, yyyy')}</span>
                     )}
                   </div>
 
-                  {/* Stock */}
                   {getStockBadge(medicine.stock_quantity, medicine.low_stock_threshold)}
                 </CardContent>
               </Card>
@@ -245,12 +249,7 @@ export default function MedicinesPage() {
           </div>
         )}
 
-        {/* Dialogs */}
-        <AddMedicineDialog
-          open={isAddOpen}
-          onOpenChange={setIsAddOpen}
-          onSuccess={fetchMedicines}
-        />
+        <AddMedicineDialog open={isAddOpen} onOpenChange={setIsAddOpen} onSuccess={fetchMedicines} />
 
         {editingMedicine && (
           <EditMedicineDialog

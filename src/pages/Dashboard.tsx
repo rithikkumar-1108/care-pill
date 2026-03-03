@@ -30,37 +30,21 @@ export default function DashboardPage() {
     localStorage.setItem('meditrack-reminders', String(enabled));
   };
 
-  
-
   const fetchData = async () => {
     if (!user) return;
 
     setIsLoading(true);
     try {
-      // Fetch all data in parallel
       const [schedulesRes, medicinesRes, sessionsRes, logsRes] = await Promise.all([
-        supabase
-          .from('session_schedules')
-          .select('*')
-          .eq('user_id', user.id),
-        supabase
-          .from('medicines')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_active', true),
-        supabase
-          .from('medicine_sessions')
-          .select('*'),
-        supabase
-          .from('dose_logs')
-          .select('*, medicine:medicines(*)')
-          .eq('user_id', user.id)
-          .eq('scheduled_date', today),
+        supabase.from('session_schedules').select('*').eq('user_id', user.id),
+        supabase.from('medicines').select('*').eq('user_id', user.id).eq('is_active', true),
+        supabase.from('medicine_sessions').select('*'),
+        supabase.from('dose_logs').select('*, medicine:medicines(*)').eq('user_id', user.id).eq('scheduled_date', today),
       ]);
 
       if (schedulesRes.data) setSchedules(schedulesRes.data as SessionSchedule[]);
       if (medicinesRes.data) setMedicines(medicinesRes.data as Medicine[]);
-      if (sessionsRes.data) setMedicineSessions(sessionsRes.data as MedicineSession[]);
+      if (sessionsRes.data) setMedicineSessions(sessionsRes.data as any[]);
       if (logsRes.data) setDoseLogs(logsRes.data as DoseLogWithMedicine[]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -68,7 +52,6 @@ export default function DashboardPage() {
     setIsLoading(false);
   };
 
-  // Schedule local notifications when reminders are enabled
   useReminderScheduler(
     remindersEnabled
       ? { medicines, medicineSessions, schedules, doseLogs, onUpdate: fetchData }
@@ -83,7 +66,6 @@ export default function DashboardPage() {
     const sessionMedicineIds = medicineSessions
       .filter((ms) => ms.session_type === sessionType)
       .map((ms) => ms.medicine_id);
-    
     return medicines.filter((m) => sessionMedicineIds.includes(m.id));
   };
 
@@ -93,6 +75,10 @@ export default function DashboardPage() {
 
   const getScheduleForSession = (sessionType: SessionType) => {
     return schedules.find((s) => s.session_type === sessionType);
+  };
+
+  const getMedicineSessionsForSession = (sessionType: SessionType) => {
+    return medicineSessions.filter((ms) => ms.session_type === sessionType);
   };
 
   if (isLoading) {
@@ -109,7 +95,7 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 overflow-y-auto">
         {/* Welcome Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
@@ -131,7 +117,6 @@ export default function DashboardPage() {
           totalMedicines={medicines.length}
           takenToday={doseLogs.filter((l) => l.status === 'taken').length}
           pendingToday={
-            // Count medicines assigned to sessions that don't have a 'taken', 'skipped', or 'missed' log
             sessions.reduce((count, sessionType) => {
               const sessionMedicines = getMedicinesForSession(sessionType);
               const sessionLogs = getDoseLogsForSession(sessionType);
@@ -156,6 +141,7 @@ export default function DashboardPage() {
                 schedule={getScheduleForSession(sessionType)}
                 medicines={getMedicinesForSession(sessionType)}
                 doseLogs={getDoseLogsForSession(sessionType)}
+                medicineSessions={getMedicineSessionsForSession(sessionType)}
                 onUpdate={fetchData}
               />
             ))}

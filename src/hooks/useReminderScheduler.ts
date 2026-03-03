@@ -32,9 +32,11 @@ export function useReminderScheduler({
   const hasScheduledRef = useRef(false);
 
   const getScheduledDateTime = useCallback(
-    (sessionType: SessionType): Date => {
-      const schedule = schedules.find((s) => s.session_type === sessionType);
-      const timeStr = schedule?.scheduled_time || SESSION_INFO[sessionType].defaultTime;
+    (sessionType: SessionType, customTime?: string | null): Date => {
+      // Use per-medicine custom_time first, then fall back to session schedule, then default
+      const timeStr = customTime
+        ? customTime.slice(0, 5)
+        : schedules.find((s) => s.session_type === sessionType)?.scheduled_time || SESSION_INFO[sessionType].defaultTime;
       const today = format(new Date(), 'yyyy-MM-dd');
       return new Date(`${today}T${timeStr}`);
     },
@@ -76,29 +78,29 @@ export function useReminderScheduler({
   useEffect(() => {
     if (!user || medicines.length === 0) return;
 
-    // Request permission on mount
     requestNotificationPermission();
 
-    const today = format(new Date(), 'yyyy-MM-dd');
     const sessionTypes: SessionType[] = ['morning', 'afternoon', 'night'];
 
-    // Cancel previous and reschedule
     cancelAllReminders();
 
     sessionTypes.forEach((sessionType) => {
-      const sessionMedicineIds = medicineSessions
-        .filter((ms) => ms.session_type === sessionType)
-        .map((ms) => ms.medicine_id);
+      const sessionMedicineSessions = medicineSessions.filter((ms) => ms.session_type === sessionType);
 
-      const sessionMeds = medicines.filter((m) => sessionMedicineIds.includes(m.id));
-      const scheduledTime = getScheduledDateTime(sessionType);
+      const sessionMeds = medicines.filter((m) =>
+        sessionMedicineSessions.some((ms) => ms.medicine_id === m.id)
+      );
 
       sessionMeds.forEach((medicine) => {
-        // Skip if dose already actioned
         const existingLog = doseLogs.find(
           (l) => l.medicine_id === medicine.id && l.session_type === sessionType,
         );
         if (existingLog && existingLog.status !== 'pending') return;
+
+        // Get custom_time for this specific medicine+session
+        const ms = sessionMedicineSessions.find((s) => s.medicine_id === medicine.id);
+        const customTime = (ms as any)?.custom_time as string | undefined;
+        const scheduledTime = getScheduledDateTime(sessionType, customTime);
 
         const config: ReminderConfig = {
           medicineId: medicine.id,

@@ -118,18 +118,21 @@ export type Database = {
       medicine_sessions: {
         Row: {
           created_at: string
+          custom_time: string | null
           id: string
           medicine_id: string
           session_type: Database["public"]["Enums"]["session_type"]
         }
         Insert: {
           created_at?: string
+          custom_time?: string | null
           id?: string
           medicine_id: string
           session_type: Database["public"]["Enums"]["session_type"]
         }
         Update: {
           created_at?: string
+          custom_time?: string | null
           id?: string
           medicine_id?: string
           session_type?: Database["public"]["Enums"]["session_type"]
