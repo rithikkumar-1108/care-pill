@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +7,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { SessionType, Medicine, DoseLogWithMedicine, SessionSchedule, DoseStatus } from '@/types/database';
+import type { SessionType, Medicine, DoseLogWithMedicine, SessionSchedule, DoseStatus, MedicineSession } from '@/types/database';
 import { cn } from '@/lib/utils';
 
 interface SessionCardProps {
@@ -14,6 +15,7 @@ interface SessionCardProps {
   schedule: SessionSchedule | undefined;
   medicines: Medicine[];
   doseLogs: DoseLogWithMedicine[];
+  medicineSessions?: MedicineSession[];
   onUpdate: () => void;
 }
 
@@ -35,9 +37,10 @@ const sessionGradients: Record<SessionType, string> = {
   night: 'session-night',
 };
 
-export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpdate }: SessionCardProps) {
+export function SessionCard({ sessionType, schedule, medicines, doseLogs, medicineSessions, onUpdate }: SessionCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [animatingId, setAnimatingId] = useState<string | null>(null);
 
   const scheduledTime = schedule?.scheduled_time
     ? format(new Date(`2000-01-01T${schedule.scheduled_time}`), 'h:mm a')
@@ -47,19 +50,37 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
     ? '2:00 PM'
     : '8:00 PM';
 
+  const getCustomTime = (medicineId: string): string | null => {
+    if (!medicineSessions) return null;
+    const ms = medicineSessions.find(
+      (s) => s.medicine_id === medicineId && s.session_type === sessionType
+    );
+    if (ms && (ms as any).custom_time) {
+      try {
+        return format(new Date(`2000-01-01T${(ms as any).custom_time}`), 'h:mm a');
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   const handleMarkDose = async (medicine: Medicine, status: DoseStatus) => {
     if (!user) return;
 
+    if (status === 'taken') {
+      setAnimatingId(medicine.id);
+      setTimeout(() => setAnimatingId(null), 600);
+    }
+
     const today = format(new Date(), 'yyyy-MM-dd');
-    
+
     try {
-      // Check if dose log exists
       const existingLog = doseLogs.find(
         (log) => log.medicine_id === medicine.id && log.session_type === sessionType
       );
 
       if (existingLog) {
-        // Update existing log
         const { error } = await supabase
           .from('dose_logs')
           .update({
@@ -67,10 +88,8 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
             taken_at: status === 'taken' ? new Date().toISOString() : null,
           })
           .eq('id', existingLog.id);
-
         if (error) throw error;
       } else {
-        // Create new log
         const { error } = await supabase.from('dose_logs').insert({
           user_id: user.id,
           medicine_id: medicine.id,
@@ -79,7 +98,6 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
           status,
           taken_at: status === 'taken' ? new Date().toISOString() : null,
         });
-
         if (error) throw error;
       }
 
@@ -108,26 +126,26 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
     switch (status) {
       case 'taken':
         return (
-          <Badge className="status-taken text-base px-3 py-1">
-            <Check className="w-4 h-4 mr-1" /> Taken
+          <Badge className="status-taken text-sm px-2 py-0.5">
+            <Check className="w-3 h-3 mr-1" /> Taken
           </Badge>
         );
       case 'missed':
         return (
-          <Badge className="status-missed text-base px-3 py-1">
-            <X className="w-4 h-4 mr-1" /> Missed
+          <Badge className="status-missed text-sm px-2 py-0.5">
+            <X className="w-3 h-3 mr-1" /> Missed
           </Badge>
         );
       case 'skipped':
         return (
-          <Badge className="status-skipped text-base px-3 py-1">
-            <X className="w-4 h-4 mr-1" /> Skipped
+          <Badge className="status-skipped text-sm px-2 py-0.5">
+            <X className="w-3 h-3 mr-1" /> Skipped
           </Badge>
         );
       default:
         return (
-          <Badge className="status-pending text-base px-3 py-1">
-            <Clock className="w-4 h-4 mr-1" /> Pending
+          <Badge className="status-pending text-sm px-2 py-0.5">
+            <Clock className="w-3 h-3 mr-1" /> Pending
           </Badge>
         );
     }
@@ -157,10 +175,16 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
         ) : (
           medicines.map((medicine) => {
             const status = getDoseStatus(medicine.id);
+            const customTime = getCustomTime(medicine.id);
+            const isTakenAnim = animatingId === medicine.id;
+
             return (
               <div
                 key={medicine.id}
-                className="p-4 bg-white/50 dark:bg-black/10 rounded-xl space-y-3"
+                className={cn(
+                  'p-4 bg-white/50 dark:bg-black/10 rounded-xl space-y-3 transition-all duration-300',
+                  isTakenAnim && 'scale-95 opacity-70'
+                )}
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -168,6 +192,11 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
                     <p className="text-muted-foreground">
                       {medicine.dosage} {medicine.dosage_unit}
                     </p>
+                    {customTime && (
+                      <p className="text-xs text-primary flex items-center gap-1 mt-0.5">
+                        <Clock className="w-3 h-3" /> {customTime}
+                      </p>
+                    )}
                     {medicine.instructions && (
                       <p className="text-sm text-muted-foreground mt-1">
                         {medicine.instructions}
@@ -178,20 +207,22 @@ export function SessionCard({ sessionType, schedule, medicines, doseLogs, onUpda
                 </div>
 
                 {status === 'pending' && (
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex gap-2">
                     <Button
-                      className="flex-1 btn-elderly bg-success hover:bg-success/90"
+                      size="sm"
+                      className="flex-1 h-9 rounded-full bg-success hover:bg-success/90 text-success-foreground text-sm font-medium gap-1.5 transition-transform active:scale-95"
                       onClick={() => handleMarkDose(medicine, 'taken')}
                     >
-                      <Check className="mr-2 h-5 w-5" />
-                      Take Medicine
+                      <Check className="h-4 w-4" />
+                      Taken
                     </Button>
                     <Button
+                      size="sm"
                       variant="outline"
-                      className="btn-elderly shrink-0"
+                      className="h-9 rounded-full px-4 text-sm font-medium gap-1.5 transition-transform active:scale-95"
                       onClick={() => handleMarkDose(medicine, 'skipped')}
                     >
-                      <X className="mr-2 h-5 w-5" />
+                      <X className="h-4 w-4" />
                       Skip
                     </Button>
                   </div>

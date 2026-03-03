@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FlaskConical, Plus, X, Loader2, AlertTriangle } from 'lucide-react';
+import { FlaskConical, Plus, X, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,7 @@ export function InteractionChecker() {
   const [currentInput, setCurrentInput] = useState('');
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const addMedicine = () => {
     const name = currentInput.trim();
@@ -51,6 +52,7 @@ export function InteractionChecker() {
 
     setIsLoading(true);
     setResult('');
+    setIsExpanded(true);
 
     try {
       const resp = await fetch(INTERACTION_URL, {
@@ -117,9 +119,9 @@ export function InteractionChecker() {
     setMedicines([]);
     setCurrentInput('');
     setResult('');
+    setIsExpanded(false);
   };
 
-  // Load user's active medicines as suggestions
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const loadSuggestions = async () => {
     if (!user) return;
@@ -131,6 +133,8 @@ export function InteractionChecker() {
     if (data) setSuggestions(data.map((m) => m.name));
   };
 
+  const shouldTruncate = result.length > 500 && !isExpanded;
+
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) loadSuggestions(); }}>
       <DialogTrigger asChild>
@@ -139,7 +143,7 @@ export function InteractionChecker() {
           Interaction Checker
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5 text-primary" />
@@ -147,7 +151,7 @@ export function InteractionChecker() {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 min-h-0 flex flex-col">
+        <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1">
           {/* Input area */}
           <div className="space-y-2">
             <div className="flex gap-2">
@@ -164,7 +168,6 @@ export function InteractionChecker() {
               </Button>
             </div>
 
-            {/* Suggestions from user's medicines */}
             {suggestions.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Your medicines:</p>
@@ -185,7 +188,6 @@ export function InteractionChecker() {
               </div>
             )}
 
-            {/* Selected medicines */}
             {medicines.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {medicines.map((m, i) => (
@@ -215,11 +217,31 @@ export function InteractionChecker() {
 
           {/* Results */}
           {result && (
-            <ScrollArea className="flex-1 min-h-0 rounded-md border p-4">
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown>{result}</ReactMarkdown>
-              </div>
-            </ScrollArea>
+            <div className="rounded-xl border bg-card p-4 space-y-2">
+              <ScrollArea className={shouldTruncate ? 'max-h-[200px]' : 'max-h-[40vh]'}>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown>{shouldTruncate ? result.slice(0, 500) + '...' : result}</ReactMarkdown>
+                </div>
+              </ScrollArea>
+              {result.length > 500 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full gap-1 text-primary"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="h-4 w-4" /> Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4" /> Read More
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </DialogContent>
