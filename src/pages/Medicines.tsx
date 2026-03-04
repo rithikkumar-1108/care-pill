@@ -283,7 +283,18 @@ export default function MedicinesPage() {
           </div>
         )}
 
-        <AddMedicineDialog open={isAddOpen} onOpenChange={setIsAddOpen} onSuccess={fetchMedicines} />
+        <AddMedicineDialog
+          open={isAddOpen}
+          onOpenChange={setIsAddOpen}
+          onSuccess={handleAddSuccess}
+          prefill={prefillMedicines.length > 0 ? prefillMedicines[prefillIndex] : undefined}
+        />
+
+        <PrescriptionUploadDialog
+          open={isUploadOpen}
+          onOpenChange={setIsUploadOpen}
+          onMedicinesExtracted={handlePrescriptionExtracted}
+        />
 
         {editingMedicine && (
           <EditMedicineDialog
