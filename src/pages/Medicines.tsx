@@ -183,10 +183,16 @@ export default function MedicinesPage() {
               Manage your medicine schedule and stock
             </p>
           </div>
-          <Button className="btn-elderly bg-primary" onClick={() => setIsAddOpen(true)}>
-            <Plus className="mr-2 h-5 w-5" />
-            Add Medicine
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="btn-elderly" onClick={() => setIsUploadOpen(true)}>
+              <Upload className="mr-2 h-5 w-5" />
+              Upload Prescription
+            </Button>
+            <Button className="btn-elderly bg-primary" onClick={() => setIsAddOpen(true)}>
+              <Plus className="mr-2 h-5 w-5" />
+              Add Medicine
+            </Button>
+          </div>
         </div>
 
         {/* Medicine List */}
