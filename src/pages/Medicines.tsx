@@ -269,13 +269,12 @@ export default function MedicinesPage() {
           open={isAddOpen}
           onOpenChange={setIsAddOpen}
           onSuccess={handleAddSuccess}
-          prefill={prefillMedicines.length > 0 ? prefillMedicines[prefillIndex] : undefined}
         />
 
         <PrescriptionUploadDialog
           open={isUploadOpen}
           onOpenChange={setIsUploadOpen}
-          onMedicinesExtracted={handlePrescriptionExtracted}
+          onBulkSaveComplete={handleBulkSaveComplete}
         />
 
         {editingMedicine && (
