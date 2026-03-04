@@ -31,7 +31,34 @@ export default function MedicinesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [medicines, setMedicines] = useState<MedicineWithSessions[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<MedicineWithSessions | null>(null);
+  const [prefillMedicines, setPrefillMedicines] = useState<ExtractedMedicine[]>([]);
+  const [prefillIndex, setPrefillIndex] = useState(0);
+
+  const handlePrescriptionExtracted = (extracted: ExtractedMedicine[]) => {
+    if (extracted.length > 0) {
+      setPrefillMedicines(extracted);
+      setPrefillIndex(0);
+      setIsAddOpen(true);
+      toast({
+        title: `${extracted.length} medicine(s) extracted`,
+        description: 'Review and save each medicine one by one.',
+      });
+    }
+  };
+
+  const handleAddSuccess = () => {
+    fetchMedicines();
+    // If there are more prefilled medicines, open next one
+    if (prefillMedicines.length > 0 && prefillIndex < prefillMedicines.length - 1) {
+      setPrefillIndex((i) => i + 1);
+      setTimeout(() => setIsAddOpen(true), 300);
+    } else {
+      setPrefillMedicines([]);
+      setPrefillIndex(0);
+    }
+  };
 
   const fetchMedicines = async () => {
     if (!user) return;
