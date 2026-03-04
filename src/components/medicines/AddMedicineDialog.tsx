@@ -25,11 +25,13 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Sun, Cloud, Moon, Clock } from 'lucide-react';
 import type { SessionType } from '@/types/database';
+import type { ExtractedMedicine } from '@/components/prescription/PrescriptionUploadDialog';
 
 interface AddMedicineDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  prefill?: ExtractedMedicine;
 }
 
 const dosageUnits = ['tablet', 'capsule', 'ml', 'mg', 'drops', 'puff', 'patch', 'injection'];
