@@ -10,7 +10,7 @@ import type { Medicine, MedicineSession, SessionType } from '@/types/database';
 import { getStockStatus, SESSION_INFO } from '@/types/database';
 import { AddMedicineDialog } from '@/components/medicines/AddMedicineDialog';
 import { EditMedicineDialog } from '@/components/medicines/EditMedicineDialog';
-import { PrescriptionUploadDialog, type ExtractedMedicine } from '@/components/prescription/PrescriptionUploadDialog';
+import { PrescriptionUploadDialog } from '@/components/prescription/PrescriptionUploadDialog';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
