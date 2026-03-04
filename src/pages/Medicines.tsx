@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, Trash2, Pill, Loader2, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, Pill, Loader2, Clock, Upload } from 'lucide-react';
 import type { Medicine, MedicineSession, SessionType } from '@/types/database';
 import { getStockStatus, SESSION_INFO } from '@/types/database';
 import { AddMedicineDialog } from '@/components/medicines/AddMedicineDialog';
 import { EditMedicineDialog } from '@/components/medicines/EditMedicineDialog';
+import { PrescriptionUploadDialog, type ExtractedMedicine } from '@/components/prescription/PrescriptionUploadDialog';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -30,7 +31,34 @@ export default function MedicinesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [medicines, setMedicines] = useState<MedicineWithSessions[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<MedicineWithSessions | null>(null);
+  const [prefillMedicines, setPrefillMedicines] = useState<ExtractedMedicine[]>([]);
+  const [prefillIndex, setPrefillIndex] = useState(0);
+
+  const handlePrescriptionExtracted = (extracted: ExtractedMedicine[]) => {
+    if (extracted.length > 0) {
+      setPrefillMedicines(extracted);
+      setPrefillIndex(0);
+      setIsAddOpen(true);
+      toast({
+        title: `${extracted.length} medicine(s) extracted`,
+        description: 'Review and save each medicine one by one.',
+      });
+    }
+  };
+
+  const handleAddSuccess = () => {
+    fetchMedicines();
+    // If there are more prefilled medicines, open next one
+    if (prefillMedicines.length > 0 && prefillIndex < prefillMedicines.length - 1) {
+      setPrefillIndex((i) => i + 1);
+      setTimeout(() => setIsAddOpen(true), 300);
+    } else {
+      setPrefillMedicines([]);
+      setPrefillIndex(0);
+    }
+  };
 
   const fetchMedicines = async () => {
     if (!user) return;
@@ -155,10 +183,16 @@ export default function MedicinesPage() {
               Manage your medicine schedule and stock
             </p>
           </div>
-          <Button className="btn-elderly bg-primary" onClick={() => setIsAddOpen(true)}>
-            <Plus className="mr-2 h-5 w-5" />
-            Add Medicine
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="btn-elderly" onClick={() => setIsUploadOpen(true)}>
+              <Upload className="mr-2 h-5 w-5" />
+              Upload Prescription
+            </Button>
+            <Button className="btn-elderly bg-primary" onClick={() => setIsAddOpen(true)}>
+              <Plus className="mr-2 h-5 w-5" />
+              Add Medicine
+            </Button>
+          </div>
         </div>
 
         {/* Medicine List */}
@@ -249,7 +283,18 @@ export default function MedicinesPage() {
           </div>
         )}
 
-        <AddMedicineDialog open={isAddOpen} onOpenChange={setIsAddOpen} onSuccess={fetchMedicines} />
+        <AddMedicineDialog
+          open={isAddOpen}
+          onOpenChange={setIsAddOpen}
+          onSuccess={handleAddSuccess}
+          prefill={prefillMedicines.length > 0 ? prefillMedicines[prefillIndex] : undefined}
+        />
+
+        <PrescriptionUploadDialog
+          open={isUploadOpen}
+          onOpenChange={setIsUploadOpen}
+          onMedicinesExtracted={handlePrescriptionExtracted}
+        />
 
         {editingMedicine && (
           <EditMedicineDialog

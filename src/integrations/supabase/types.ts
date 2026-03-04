@@ -159,6 +159,7 @@ export type Database = {
           is_active: boolean | null
           low_stock_threshold: number
           name: string
+          prescription_id: string | null
           start_date: string
           stock_quantity: number
           updated_at: string
@@ -175,6 +176,7 @@ export type Database = {
           is_active?: boolean | null
           low_stock_threshold?: number
           name: string
+          prescription_id?: string | null
           start_date: string
           stock_quantity?: number
           updated_at?: string
@@ -191,12 +193,21 @@ export type Database = {
           is_active?: boolean | null
           low_stock_threshold?: number
           name?: string
+          prescription_id?: string | null
           start_date?: string
           stock_quantity?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "medicines_prescription_id_fkey"
+            columns: ["prescription_id"]
+            isOneToOne: false
+            referencedRelation: "prescriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_logs: {
         Row: {
@@ -230,6 +241,45 @@ export type Database = {
           recipient_phone?: string | null
           sent_at?: string | null
           status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      prescriptions: {
+        Row: {
+          created_at: string
+          extracted_medicines: Json | null
+          extracted_text: string | null
+          file_name: string
+          file_type: string
+          file_url: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          extracted_medicines?: Json | null
+          extracted_text?: string | null
+          file_name: string
+          file_type: string
+          file_url: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          extracted_medicines?: Json | null
+          extracted_text?: string | null
+          file_name?: string
+          file_type?: string
+          file_url?: string
+          id?: string
+          status?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

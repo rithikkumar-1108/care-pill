@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,11 +25,13 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Sun, Cloud, Moon, Clock } from 'lucide-react';
 import type { SessionType } from '@/types/database';
+import type { ExtractedMedicine } from '@/components/prescription/PrescriptionUploadDialog';
 
 interface AddMedicineDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  prefill?: ExtractedMedicine;
 }
 
 const dosageUnits = ['tablet', 'capsule', 'ml', 'mg', 'drops', 'puff', 'patch', 'injection'];
@@ -40,7 +42,7 @@ const sessionConfig: Record<SessionType, { label: string; icon: React.ReactNode;
   night: { label: 'Night', icon: <Moon className="h-4 w-4" />, defaultTime: '20:00' },
 };
 
-export function AddMedicineDialog({ open, onOpenChange, onSuccess }: AddMedicineDialogProps) {
+export function AddMedicineDialog({ open, onOpenChange, onSuccess, prefill }: AddMedicineDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +67,31 @@ export function AddMedicineDialog({ open, onOpenChange, onSuccess }: AddMedicine
     afternoon: '14:00',
     night: '20:00',
   });
+
+  // Apply prefill when it changes
+  useEffect(() => {
+    if (prefill && open) {
+      setName(prefill.name || '');
+      setDosage(prefill.dosage || '');
+      setDosageUnit(prefill.dosage_unit || 'tablet');
+      setInstructions(prefill.instructions || '');
+      if (prefill.duration_days) {
+        const end = new Date();
+        end.setDate(end.getDate() + prefill.duration_days);
+        setEndDate(format(end, 'yyyy-MM-dd'));
+      }
+      setSessionEnabled({
+        morning: prefill.morning_enabled,
+        afternoon: prefill.afternoon_enabled,
+        night: prefill.night_enabled,
+      });
+      setSessionTimes({
+        morning: prefill.morning_time || '08:00',
+        afternoon: prefill.afternoon_time || '14:00',
+        night: prefill.night_time || '20:00',
+      });
+    }
+  }, [prefill, open]);
 
   const toggleSession = (session: SessionType) => {
     setSessionEnabled((prev) => ({ ...prev, [session]: !prev[session] }));
