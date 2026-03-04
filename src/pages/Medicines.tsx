@@ -10,7 +10,7 @@ import type { Medicine, MedicineSession, SessionType } from '@/types/database';
 import { getStockStatus, SESSION_INFO } from '@/types/database';
 import { AddMedicineDialog } from '@/components/medicines/AddMedicineDialog';
 import { EditMedicineDialog } from '@/components/medicines/EditMedicineDialog';
-import { PrescriptionUploadDialog, type ExtractedMedicine } from '@/components/prescription/PrescriptionUploadDialog';
+import { PrescriptionUploadDialog } from '@/components/prescription/PrescriptionUploadDialog';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -33,31 +33,13 @@ export default function MedicinesPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<MedicineWithSessions | null>(null);
-  const [prefillMedicines, setPrefillMedicines] = useState<ExtractedMedicine[]>([]);
-  const [prefillIndex, setPrefillIndex] = useState(0);
-
-  const handlePrescriptionExtracted = (extracted: ExtractedMedicine[]) => {
-    if (extracted.length > 0) {
-      setPrefillMedicines(extracted);
-      setPrefillIndex(0);
-      setIsAddOpen(true);
-      toast({
-        title: `${extracted.length} medicine(s) extracted`,
-        description: 'Review and save each medicine one by one.',
-      });
-    }
-  };
 
   const handleAddSuccess = () => {
     fetchMedicines();
-    // If there are more prefilled medicines, open next one
-    if (prefillMedicines.length > 0 && prefillIndex < prefillMedicines.length - 1) {
-      setPrefillIndex((i) => i + 1);
-      setTimeout(() => setIsAddOpen(true), 300);
-    } else {
-      setPrefillMedicines([]);
-      setPrefillIndex(0);
-    }
+  };
+
+  const handleBulkSaveComplete = () => {
+    fetchMedicines();
   };
 
   const fetchMedicines = async () => {
@@ -287,13 +269,12 @@ export default function MedicinesPage() {
           open={isAddOpen}
           onOpenChange={setIsAddOpen}
           onSuccess={handleAddSuccess}
-          prefill={prefillMedicines.length > 0 ? prefillMedicines[prefillIndex] : undefined}
         />
 
         <PrescriptionUploadDialog
           open={isUploadOpen}
           onOpenChange={setIsUploadOpen}
-          onMedicinesExtracted={handlePrescriptionExtracted}
+          onBulkSaveComplete={handleBulkSaveComplete}
         />
 
         {editingMedicine && (

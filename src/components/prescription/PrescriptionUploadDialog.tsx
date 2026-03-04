@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -19,14 +18,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   Upload, Camera, FileImage, FileText, Loader2, AlertTriangle,
-  Check, ChevronDown, ChevronUp, Sun, Cloud, Moon, X, Pill,
+  Check, ChevronDown, ChevronUp, Sun, Cloud, Moon, X, Pill, Trash2,
 } from 'lucide-react';
 import type { SessionType } from '@/types/database';
+import { format } from 'date-fns';
 
 interface PrescriptionUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onMedicinesExtracted: (medicines: ExtractedMedicine[]) => void;
+  onBulkSaveComplete: () => void;
 }
 
 export interface ExtractedMedicine {
@@ -56,7 +56,7 @@ const sessionIcons: Record<SessionType, React.ReactNode> = {
 export function PrescriptionUploadDialog({
   open,
   onOpenChange,
-  onMedicinesExtracted,
+  onBulkSaveComplete,
 }: PrescriptionUploadDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -67,12 +67,14 @@ export function PrescriptionUploadDialog({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [medicines, setMedicines] = useState<ExtractedMedicine[]>([]);
   const [rawText, setRawText] = useState('');
   const [showRawText, setShowRawText] = useState(false);
   const [parseError, setParseError] = useState(false);
   const [doctorName, setDoctorName] = useState('');
   const [prescriptionDate, setPrescriptionDate] = useState('');
+  const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
 
   const reset = () => {
     setStep('upload');
@@ -84,6 +86,8 @@ export function PrescriptionUploadDialog({
     setParseError(false);
     setDoctorName('');
     setPrescriptionDate('');
+    setPrescriptionId(null);
+    setIsSaving(false);
   };
 
   const handleFileSelect = (selectedFile: File) => {
@@ -112,7 +116,6 @@ export function PrescriptionUploadDialog({
     setIsProcessing(true);
 
     try {
-      // Upload file to storage
       const filePath = `${user.id}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('prescriptions')
@@ -120,34 +123,32 @@ export function PrescriptionUploadDialog({
 
       if (uploadError) throw uploadError;
 
-      // Convert to base64 for AI
       const base64 = await fileToBase64(file);
 
-      // Call edge function
       const { data, error } = await supabase.functions.invoke('parse-prescription', {
         body: { imageBase64: base64, mimeType: file.type },
       });
 
       if (error) throw error;
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      if (data.error) throw new Error(data.error);
 
       // Save prescription record
-      const { data: { publicUrl } } = supabase.storage
+      const { data: prescriptionRecord, error: prescError } = await supabase
         .from('prescriptions')
-        .getPublicUrl(filePath);
+        .insert({
+          user_id: user.id,
+          file_url: filePath,
+          file_name: file.name,
+          file_type: file.type,
+          extracted_text: data.raw_text || '',
+          extracted_medicines: data.medicines || [],
+          status: data.parse_error ? 'error' : 'processed',
+        })
+        .select()
+        .single();
 
-      await supabase.from('prescriptions').insert({
-        user_id: user.id,
-        file_url: filePath,
-        file_name: file.name,
-        file_type: file.type,
-        extracted_text: data.raw_text || '',
-        extracted_medicines: data.medicines || [],
-        status: data.parse_error ? 'error' : 'processed',
-      });
+      if (prescError) throw prescError;
+      setPrescriptionId(prescriptionRecord.id);
 
       setRawText(data.raw_text || '');
       setDoctorName(data.doctor_name || '');
@@ -179,7 +180,7 @@ export function PrescriptionUploadDialog({
       console.error('Prescription processing error:', error);
       toast({
         title: 'Processing Failed',
-        description: error.message || 'Could not extract prescription details. You can enter them manually.',
+        description: error.message || 'Could not extract prescription details.',
         variant: 'destructive',
       });
       setParseError(true);
@@ -232,15 +233,85 @@ export function PrescriptionUploadDialog({
     ]);
   };
 
-  const handleConfirm = () => {
+  const handleBulkSave = async () => {
+    if (!user) return;
     const validMedicines = medicines.filter((m) => m.name.trim());
     if (validMedicines.length === 0) {
       toast({ title: 'No medicines', description: 'Add at least one medicine name', variant: 'destructive' });
       return;
     }
-    onMedicinesExtracted(validMedicines);
-    onOpenChange(false);
-    reset();
+
+    setIsSaving(true);
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+
+      // Bulk insert all medicines
+      const medicineInserts = validMedicines.map((med) => {
+        const endDate = med.duration_days
+          ? format(new Date(Date.now() + med.duration_days * 86400000), 'yyyy-MM-dd')
+          : null;
+        return {
+          user_id: user.id,
+          name: med.name,
+          dosage: med.dosage || '1',
+          dosage_unit: med.dosage_unit || 'tablet',
+          instructions: med.instructions || null,
+          start_date: today,
+          end_date: endDate,
+          stock_quantity: 30,
+          low_stock_threshold: 10,
+          prescription_id: prescriptionId,
+        };
+      });
+
+      const { data: insertedMedicines, error: medError } = await supabase
+        .from('medicines')
+        .insert(medicineInserts)
+        .select();
+
+      if (medError) throw medError;
+      if (!insertedMedicines || insertedMedicines.length === 0) throw new Error('No medicines were saved');
+
+      // Build all session inserts
+      const sessionInserts: { medicine_id: string; session_type: SessionType; custom_time: string }[] = [];
+      insertedMedicines.forEach((inserted, idx) => {
+        const med = validMedicines[idx];
+        if (med.morning_enabled) {
+          sessionInserts.push({ medicine_id: inserted.id, session_type: 'morning', custom_time: med.morning_time + ':00' });
+        }
+        if (med.afternoon_enabled) {
+          sessionInserts.push({ medicine_id: inserted.id, session_type: 'afternoon', custom_time: med.afternoon_time + ':00' });
+        }
+        if (med.night_enabled) {
+          sessionInserts.push({ medicine_id: inserted.id, session_type: 'night', custom_time: med.night_time + ':00' });
+        }
+      });
+
+      if (sessionInserts.length > 0) {
+        const { error: sessError } = await supabase
+          .from('medicine_sessions')
+          .insert(sessionInserts);
+        if (sessError) throw sessError;
+      }
+
+      toast({
+        title: `✅ ${insertedMedicines.length} Medicine(s) Added!`,
+        description: 'All medicines from the prescription have been saved with reminders.',
+      });
+
+      onBulkSaveComplete();
+      onOpenChange(false);
+      reset();
+    } catch (error: any) {
+      console.error('Bulk save error:', error);
+      toast({
+        title: 'Save Failed',
+        description: error.message || 'Could not save medicines. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const confidenceBadge = (c: string) => {
@@ -248,6 +319,8 @@ export function PrescriptionUploadDialog({
     if (c === 'medium') return <Badge className="bg-warning/10 text-warning border-warning/20 text-xs">Medium</Badge>;
     return <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-xs">Low</Badge>;
   };
+
+  const validCount = medicines.filter((m) => m.name.trim()).length;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -261,7 +334,7 @@ export function PrescriptionUploadDialog({
           <DialogDescription>
             {step === 'upload' && 'Take a photo or upload your prescription to auto-fill medicines.'}
             {step === 'processing' && 'AI is reading your prescription...'}
-            {step === 'review' && 'Review and edit the extracted details before adding.'}
+            {step === 'review' && `${validCount} medicine(s) detected. Edit details then save all at once.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -269,7 +342,6 @@ export function PrescriptionUploadDialog({
           {/* UPLOAD STEP */}
           {step === 'upload' && (
             <div className="space-y-4 pb-4">
-              {/* Action buttons */}
               <div className="grid grid-cols-3 gap-3">
                 <Button
                   variant="outline"
@@ -319,7 +391,6 @@ export function PrescriptionUploadDialog({
                 onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
               />
 
-              {/* Preview */}
               {file && (
                 <div className="space-y-3">
                   <div className="border rounded-xl overflow-hidden bg-muted/30">
@@ -377,7 +448,6 @@ export function PrescriptionUploadDialog({
                 </div>
               )}
 
-              {/* Doctor info */}
               {(doctorName || prescriptionDate) && (
                 <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
                   {doctorName && <span>Dr: {doctorName} </span>}
@@ -385,7 +455,6 @@ export function PrescriptionUploadDialog({
                 </div>
               )}
 
-              {/* Raw text toggle */}
               {rawText && (
                 <div>
                   <Button
@@ -410,11 +479,19 @@ export function PrescriptionUploadDialog({
                 <div key={idx} className="border rounded-xl p-4 space-y-3 bg-card">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-lg">#{idx + 1}</span>
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <Pill className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="font-semibold">#{idx + 1}</span>
                       {confidenceBadge(med.confidence)}
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeMedicine(idx)}>
-                      <X className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => removeMedicine(idx)}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
 
@@ -455,6 +532,26 @@ export function PrescriptionUploadDialog({
                         className="mt-1"
                       />
                     </div>
+                    <div>
+                      <Label className="text-sm">Duration (days)</Label>
+                      <Input
+                        type="number"
+                        value={med.duration_days ?? ''}
+                        onChange={(e) => updateMedicine(idx, { duration_days: e.target.value ? parseInt(e.target.value) : null })}
+                        placeholder="e.g. 5"
+                        className="mt-1"
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Frequency</Label>
+                      <Input
+                        value={med.frequency}
+                        onChange={(e) => updateMedicine(idx, { frequency: e.target.value })}
+                        placeholder="e.g. 1-0-1"
+                        className="mt-1"
+                      />
+                    </div>
                   </div>
 
                   {/* Session toggles */}
@@ -485,10 +582,6 @@ export function PrescriptionUploadDialog({
                       );
                     })}
                   </div>
-
-                  {med.duration_days && (
-                    <p className="text-xs text-muted-foreground">Duration: {med.duration_days} days</p>
-                  )}
                 </div>
               ))}
 
@@ -509,12 +602,16 @@ export function PrescriptionUploadDialog({
                 Start Over
               </Button>
               <Button
-                onClick={handleConfirm}
-                disabled={medicines.filter((m) => m.name.trim()).length === 0}
-                className="bg-primary"
+                onClick={handleBulkSave}
+                disabled={validCount === 0 || isSaving}
+                className="bg-primary gap-2"
               >
-                <Check className="mr-2 h-4 w-4" />
-                Add {medicines.filter((m) => m.name.trim()).length} Medicine(s)
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                {isSaving ? 'Saving...' : `Add All ${validCount} Medicine(s)`}
               </Button>
             </>
           )}
