@@ -15,6 +15,7 @@ import SettingsPage from "./pages/Settings";
 import CaregiverDashboardPage from "./pages/CaregiverDashboard";
 import CaregiverLoginPage from "./pages/CaregiverLogin";
 import AcceptInvitePage from "./pages/AcceptInvite";
+import InstallPage from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
