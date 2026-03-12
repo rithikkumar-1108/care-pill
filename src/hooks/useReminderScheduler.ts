@@ -76,6 +76,21 @@ export function useReminderScheduler({
     [user, doseLogs, onUpdate],
   );
 
+  // Register SW on mount
+  useEffect(() => {
+    registerSWReminders();
+
+    // Listen for dose actions from SW (Taken button in notification)
+    const handler = (e: Event) => {
+      const { medicineId, sessionType, action } = (e as CustomEvent).detail;
+      if (action === 'taken') {
+        markDose(medicineId, sessionType, 'taken');
+      }
+    };
+    window.addEventListener('sw-dose-action', handler);
+    return () => window.removeEventListener('sw-dose-action', handler);
+  }, [markDose]);
+
   useEffect(() => {
     if (!user || medicines.length === 0) return;
 
@@ -84,6 +99,16 @@ export function useReminderScheduler({
     const sessionTypes: SessionType[] = ['morning', 'afternoon', 'night'];
 
     cancelAllReminders();
+    cancelSWReminders();
+
+    const swReminderConfigs: Array<{
+      medicineId: string;
+      medicineName: string;
+      dosage: string;
+      dosageUnit: string;
+      sessionType: string;
+      scheduledMs: number;
+    }> = [];
 
     sessionTypes.forEach((sessionType) => {
       const sessionMedicineSessions = medicineSessions.filter((ms) => ms.session_type === sessionType);
@@ -98,7 +123,6 @@ export function useReminderScheduler({
         );
         if (existingLog && existingLog.status !== 'pending') return;
 
-        // Get custom_time for this specific medicine+session
         const ms = sessionMedicineSessions.find((s) => s.medicine_id === medicine.id);
         const customTime = (ms as any)?.custom_time as string | undefined;
         const scheduledTime = getScheduledDateTime(sessionType, customTime);
@@ -112,19 +136,36 @@ export function useReminderScheduler({
           scheduledTime,
         };
 
+        // In-tab reminders (existing)
         scheduleReminders(
           config,
           () => markDose(medicine.id, sessionType, 'taken'),
           () => markDose(medicine.id, sessionType, 'skipped'),
           () => markDose(medicine.id, sessionType, 'missed'),
         );
+
+        // Also send to SW for background notifications
+        swReminderConfigs.push({
+          medicineId: medicine.id,
+          medicineName: medicine.name,
+          dosage: medicine.dosage,
+          dosageUnit: medicine.dosage_unit,
+          sessionType,
+          scheduledMs: scheduledTime.getTime(),
+        });
       });
     });
+
+    // Send all configs to service worker
+    if (swReminderConfigs.length > 0) {
+      sendRemindersToSW(swReminderConfigs);
+    }
 
     hasScheduledRef.current = true;
 
     return () => {
       cancelAllReminders();
+      cancelSWReminders();
     };
   }, [user, medicines, medicineSessions, schedules, doseLogs, getScheduledDateTime, markDose]);
 }

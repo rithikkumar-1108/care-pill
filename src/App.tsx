@@ -39,6 +39,7 @@ const App = () => (
             <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/caregiver" element={<ProtectedRoute><CaregiverDashboardPage /></ProtectedRoute>} />
+            <Route path="/install" element={<InstallPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
