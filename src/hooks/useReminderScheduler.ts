@@ -9,6 +9,7 @@ import {
   requestNotificationPermission,
   type ReminderConfig,
 } from '@/services/notificationService';
+import { registerSWReminders, sendRemindersToSW, cancelSWReminders } from '@/services/swReminderService';
 import type { SessionType, Medicine, MedicineSession, SessionSchedule, DoseLogWithMedicine } from '@/types/database';
 import { SESSION_INFO } from '@/types/database';
 
