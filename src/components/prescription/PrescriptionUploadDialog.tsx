@@ -338,7 +338,7 @@ export function PrescriptionUploadDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
           {/* UPLOAD STEP */}
           {step === 'upload' && (
             <div className="space-y-4 pb-4">
