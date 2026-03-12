@@ -15,6 +15,7 @@ import SettingsPage from "./pages/Settings";
 import CaregiverDashboardPage from "./pages/CaregiverDashboard";
 import CaregiverLoginPage from "./pages/CaregiverLogin";
 import AcceptInvitePage from "./pages/AcceptInvite";
+import InstallPage from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/caregiver" element={<ProtectedRoute><CaregiverDashboardPage /></ProtectedRoute>} />
+            <Route path="/install" element={<InstallPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
