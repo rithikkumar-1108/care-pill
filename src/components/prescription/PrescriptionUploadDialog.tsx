@@ -590,7 +590,7 @@ export function PrescriptionUploadDialog({
               </Button>
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="p-6 pt-4 border-t">
           {step === 'upload' && (
