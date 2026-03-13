@@ -70,17 +70,16 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-muted rounded-xl">
-            <Clock className="h-5 w-5 text-primary" />
-            <span className="text-lg font-semibold tabular-nums text-foreground">
-              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-
-
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-muted rounded-xl">
+              <Clock className="h-5 w-5 text-primary" />
+              <span className="text-lg font-semibold tabular-nums text-foreground">
+                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+              </span>
+            </div>
             <Button variant="ghost" size="icon" className="h-12 w-12 relative">
               <Bell className="h-6 w-6" />
               <span className="absolute top-2 right-2 w-3 h-3 bg-destructive rounded-full" />
