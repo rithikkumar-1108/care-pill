@@ -1,5 +1,6 @@
-// Local browser notification service for medicine reminders
-// Works offline, no external API dependencies
+// Real-time clock-based notification service for medicine reminders
+// Uses a 1-second polling interval to compare device clock against scheduled times
+// This ensures exact real-world clock triggering, not drift-prone setTimeout
 
 export type SoundStyle = 'gentle' | 'loud' | 'vibrate_only';
 
@@ -20,50 +21,28 @@ export interface ReminderConfig {
   scheduledTime: Date; // Full date+time of the dose
 }
 
-interface ScheduledReminder {
-  timeoutId: ReturnType<typeof setTimeout>;
-  type: 'pre' | 'on-time' | 'post' | 'missed';
+interface ClockReminder {
+  id: string; // unique key: medicineId_sessionType_offset
+  medicineId: string;
+  sessionType: string;
+  triggerAtMs: number; // exact ms timestamp to fire
+  title: string;
+  body: string;
+  tag: string;
+  isMissed: boolean;
+  fired: boolean;
+  onFire?: () => void; // callback (e.g. markMissed)
 }
 
-// Track all active reminders by medicine+session key
-const activeReminders = new Map<string, ScheduledReminder[]>();
+// All registered reminders checked every second
+const clockReminders: Map<string, ClockReminder> = new Map();
+let clockInterval: ReturnType<typeof setInterval> | null = null;
 
-function getReminderKey(medicineId: string, sessionType: string): string {
-  return `${medicineId}_${sessionType}`;
-}
+// --- Sound & Vibration ---
 
-// Generate the 5 notification messages
-function getNotificationMessages(name: string, dosage: string, unit: string, timeStr: string) {
-  return [
-    { offset: -2, title: '⏰ Upcoming Reminder', body: `Reminder: Take ${name} ${dosage}${unit} at ${timeStr}.` },
-    { offset: -1, title: '💊 Almost Time', body: `Almost time for ${name} ${dosage}${unit}.` },
-    { offset: 0, title: '🔔 Time to Take Medicine', body: `It's time to take ${name} ${dosage}${unit}.` },
-    { offset: 1, title: '⚠️ Pending Dose', body: `You haven't marked ${name} ${dosage}${unit} as taken.` },
-    { offset: 2, title: '🚨 Final Reminder', body: `Final reminder: Take ${name} ${dosage}${unit} now.` },
-  ];
-}
-
-export async function requestNotificationPermission(): Promise<boolean> {
-  if (!('Notification' in window)) {
-    console.warn('Browser does not support notifications');
-    return false;
-  }
-  if (Notification.permission === 'granted') return true;
-  if (Notification.permission === 'denied') return false;
-  const result = await Notification.requestPermission();
-  return result === 'granted';
-}
-
-export function getNotificationPermissionStatus(): NotificationPermission | 'unsupported' {
-  if (!('Notification' in window)) return 'unsupported';
-  return Notification.permission;
-}
-
-// Play a short alert sound + vibrate based on user's chosen style
 function playAlertSound(isMissed = false) {
   const style = getSoundStyle();
 
-  // Sound
   if (style !== 'vibrate_only') {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -101,7 +80,6 @@ function playAlertSound(isMissed = false) {
     }
   }
 
-  // Vibrate (always for vibrate_only, otherwise based on context)
   if ('vibrate' in navigator) {
     if (style === 'vibrate_only') {
       navigator.vibrate(isMissed ? [300, 150, 300, 150, 300] : [200, 100, 200]);
@@ -113,7 +91,6 @@ function playAlertSound(isMissed = false) {
   }
 }
 
-// Preview sound for settings UI
 export function previewSound(style: SoundStyle): void {
   const prev = getSoundStyle();
   localStorage.setItem('meditrack-sound-style', style);
@@ -121,15 +98,31 @@ export function previewSound(style: SoundStyle): void {
   localStorage.setItem('meditrack-sound-style', prev);
 }
 
+// --- Notification Permission ---
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const result = await Notification.requestPermission();
+  return result === 'granted';
+}
+
+export function getNotificationPermissionStatus(): NotificationPermission | 'unsupported' {
+  if (!('Notification' in window)) return 'unsupported';
+  return Notification.permission;
+}
+
+// --- Show Notification ---
+
 function showNotification(title: string, body: string, tag: string, isMissed = false) {
-  // Play sound & vibrate regardless of notification permission
   playAlertSound(isMissed);
 
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
   const notification = new Notification(title, {
     body,
-    icon: '/favicon.ico',
+    icon: '/pwa-192x192.png',
     tag,
     requireInteraction: true,
     silent: true, // We handle sound ourselves
@@ -141,71 +134,174 @@ function showNotification(title: string, body: string, tag: string, isMissed = f
   };
 }
 
+// --- Real-Time Clock Engine ---
+
+function startClockEngine() {
+  if (clockInterval) return; // already running
+  clockInterval = setInterval(tickClock, 1000);
+  console.log('[ReminderEngine] Real-time clock started – checking every 1s');
+}
+
+function stopClockEngine() {
+  if (clockInterval) {
+    clearInterval(clockInterval);
+    clockInterval = null;
+  }
+}
+
+function tickClock() {
+  const now = Date.now();
+
+  clockReminders.forEach((reminder) => {
+    if (reminder.fired) return;
+
+    // Fire if current time is within 1.5s window of trigger time
+    if (now >= reminder.triggerAtMs && now - reminder.triggerAtMs < 1500) {
+      reminder.fired = true;
+      console.log(`[ReminderEngine] 🔔 Firing: ${reminder.title} at ${new Date().toLocaleTimeString()}`);
+      showNotification(reminder.title, reminder.body, reminder.tag, reminder.isMissed);
+      if (reminder.onFire) reminder.onFire();
+    }
+  });
+
+  // Clean up old fired reminders (> 2 min past trigger)
+  clockReminders.forEach((reminder, key) => {
+    if (reminder.fired && now - reminder.triggerAtMs > 120_000) {
+      clockReminders.delete(key);
+    }
+    // Also remove reminders that were never fired but are > 2 min past
+    if (!reminder.fired && now - reminder.triggerAtMs > 120_000) {
+      clockReminders.delete(key);
+    }
+  });
+
+  // Stop engine if no reminders left
+  if (clockReminders.size === 0) {
+    stopClockEngine();
+  }
+}
+
+// --- Notification Messages ---
+
+function getNotificationMessages(name: string, dosage: string, unit: string, timeStr: string) {
+  return [
+    { offset: -2, title: '⏰ Upcoming Reminder', body: `Reminder: Take ${name} ${dosage}${unit} at ${timeStr}.`, isMissed: false },
+    { offset: -1, title: '💊 Almost Time', body: `Almost time for ${name} ${dosage}${unit}.`, isMissed: false },
+    { offset: 0, title: '🔔 Time to Take Medicine', body: `It's time to take ${name} ${dosage}${unit}.`, isMissed: false },
+    { offset: 1, title: '⚠️ Pending Dose', body: `You haven't marked ${name} ${dosage}${unit} as taken.`, isMissed: false },
+    { offset: 2, title: '🚨 Final Reminder', body: `Final reminder: Take ${name} ${dosage}${unit} now.`, isMissed: false },
+  ];
+}
+
+// --- Public API ---
+
 export function scheduleReminders(
   config: ReminderConfig,
   onMarkTaken: () => void,
   onMarkSkipped: () => void,
   onMarkMissed: () => void,
 ): void {
-  const key = getReminderKey(config.medicineId, config.sessionType);
+  const baseKey = `${config.medicineId}_${config.sessionType}`;
 
-  // Cancel any existing reminders for this medicine+session
+  // Cancel existing reminders for this medicine+session
   cancelReminders(config.medicineId, config.sessionType);
 
   const now = Date.now();
   const scheduledMs = config.scheduledTime.getTime();
   const timeStr = config.scheduledTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const messages = getNotificationMessages(config.medicineName, config.dosage, config.dosageUnit, timeStr);
-  const tag = `medicine-${key}`;
-  const reminders: ScheduledReminder[] = [];
 
-  // Schedule the 5 notifications
+  // Register each notification checkpoint with the clock engine
   messages.forEach((msg) => {
-    const triggerAt = scheduledMs + msg.offset * 60 * 1000;
-    const delay = triggerAt - now;
+    const triggerAtMs = scheduledMs + msg.offset * 60_000;
+    if (triggerAtMs <= now) return; // skip past triggers
 
-    if (delay > 0) {
-      const timeoutId = setTimeout(() => {
-        showNotification(msg.title, msg.body, tag);
-      }, delay);
-      reminders.push({ timeoutId, type: msg.offset < 0 ? 'pre' : msg.offset === 0 ? 'on-time' : 'post' });
-    }
+    const id = `${baseKey}_offset${msg.offset}`;
+    clockReminders.set(id, {
+      id,
+      medicineId: config.medicineId,
+      sessionType: config.sessionType,
+      triggerAtMs,
+      title: msg.title,
+      body: msg.body,
+      tag: `medicine-${baseKey}`,
+      isMissed: false,
+      fired: false,
+    });
   });
 
-  // Schedule auto-miss at scheduled_time + 5 minutes
-  const missDelay = scheduledMs + 5 * 60 * 1000 - now;
-  if (missDelay > 0) {
-    const missTimeout = setTimeout(() => {
-      showNotification(
-        '❌ Missed Dose',
-        `You missed ${config.medicineName} ${config.dosage}${config.dosageUnit} scheduled at ${timeStr}.`,
-        `${tag}-missed`,
-        true,
-      );
-      onMarkMissed();
-    }, missDelay);
-    reminders.push({ timeoutId: missTimeout, type: 'missed' });
+  // Missed dose trigger at +5 min
+  const missedTrigger = scheduledMs + 5 * 60_000;
+  if (missedTrigger > now) {
+    const missedId = `${baseKey}_missed`;
+    clockReminders.set(missedId, {
+      id: missedId,
+      medicineId: config.medicineId,
+      sessionType: config.sessionType,
+      triggerAtMs: missedTrigger,
+      title: '❌ Missed Dose',
+      body: `You missed ${config.medicineName} ${config.dosage}${config.dosageUnit} scheduled at ${timeStr}.`,
+      tag: `medicine-${baseKey}-missed`,
+      isMissed: true,
+      fired: false,
+      onFire: onMarkMissed,
+    });
   }
 
-  activeReminders.set(key, reminders);
+  // Start the engine if not running
+  startClockEngine();
+
+  console.log(`[ReminderEngine] Scheduled ${config.medicineName} (${config.sessionType}) at ${timeStr} — ${clockReminders.size} total entries`);
 }
 
 export function cancelReminders(medicineId: string, sessionType: string): void {
-  const key = getReminderKey(medicineId, sessionType);
-  const reminders = activeReminders.get(key);
-  if (reminders) {
-    reminders.forEach((r) => clearTimeout(r.timeoutId));
-    activeReminders.delete(key);
-  }
+  const prefix = `${medicineId}_${sessionType}`;
+  clockReminders.forEach((_, key) => {
+    if (key.startsWith(prefix)) {
+      clockReminders.delete(key);
+    }
+  });
 }
 
 export function cancelAllReminders(): void {
-  activeReminders.forEach((reminders) => {
-    reminders.forEach((r) => clearTimeout(r.timeoutId));
-  });
-  activeReminders.clear();
+  clockReminders.clear();
+  stopClockEngine();
 }
 
 export function hasActiveReminders(medicineId: string, sessionType: string): boolean {
-  return activeReminders.has(getReminderKey(medicineId, sessionType));
+  const prefix = `${medicineId}_${sessionType}`;
+  for (const key of clockReminders.keys()) {
+    if (key.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+/** Returns the next upcoming (unfired) reminder trigger time, or null */
+export function getNextReminderTime(): { triggerAtMs: number; medicineName: string; title: string } | null {
+  let earliest: ClockReminder | null = null;
+  const now = Date.now();
+
+  clockReminders.forEach((r) => {
+    if (r.fired || r.triggerAtMs <= now) return;
+    if (!earliest || r.triggerAtMs < earliest.triggerAtMs) {
+      earliest = r;
+    }
+  });
+
+  if (!earliest) return null;
+  return {
+    triggerAtMs: (earliest as ClockReminder).triggerAtMs,
+    medicineName: (earliest as ClockReminder).body,
+    title: (earliest as ClockReminder).title,
+  };
+}
+
+/** Returns count of active (unfired, future) reminders */
+export function getActiveReminderCount(): number {
+  const now = Date.now();
+  let count = 0;
+  clockReminders.forEach((r) => {
+    if (!r.fired && r.triggerAtMs > now) count++;
+  });
+  return count;
 }
