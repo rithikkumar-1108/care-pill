@@ -113,6 +113,9 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Next Reminder Countdown */}
+        {remindersEnabled && <NextReminderCountdown />}
+
         {/* Quick Stats */}
         <QuickStats
           totalMedicines={medicines.length}
