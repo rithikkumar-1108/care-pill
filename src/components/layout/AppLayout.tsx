@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,8 +13,8 @@ import {
   X,
   Bell,
   Users,
+  Clock,
 } from 'lucide-react';
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
@@ -31,9 +31,15 @@ const navItems = [
 
 export function AppLayout({ children }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const { profile, signOut, isCaregiver } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -65,6 +71,15 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-muted rounded-xl">
+              <Clock className="h-5 w-5 text-primary" />
+              <span className="text-lg font-semibold tabular-nums text-foreground">
+                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+              </span>
+            </div>
             <Button variant="ghost" size="icon" className="h-12 w-12 relative">
               <Bell className="h-6 w-6" />
               <span className="absolute top-2 right-2 w-3 h-3 bg-destructive rounded-full" />
