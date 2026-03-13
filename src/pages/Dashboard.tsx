@@ -11,6 +11,7 @@ import { ChatBot } from '@/components/chat/ChatBot';
 import { InteractionChecker } from '@/components/medicines/InteractionChecker';
 import { ReminderSettings } from '@/components/reminders/ReminderSettings';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
+import { NextReminderCountdown } from '@/components/dashboard/NextReminderCountdown';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
